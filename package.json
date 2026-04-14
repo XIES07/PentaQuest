@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "build": "npm run typecheck && node ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
