@@ -122,6 +122,18 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  private readonly onCombatBgmComplete = (): void => {
+    if (!this.scene.isActive()) {
+      return;
+    }
+    const music = this.sound.get(BattleScene.BGM_COMBAT_KEY);
+    const marker = BattleScene.BGM_COMBAT_MARKER;
+    if (!music?.markers[marker]) {
+      return;
+    }
+    music.play(marker);
+  };
+
   private startCombatMusic(): void {
     const key = BattleScene.BGM_COMBAT_KEY;
     const marker = BattleScene.BGM_COMBAT_MARKER;
@@ -129,13 +141,18 @@ export class BattleScene extends Phaser.Scene {
     if (!music) {
       music = this.sound.add(key);
     }
-    if (!music.markers[marker]) {
-      music.addMarker({
-        name: marker,
-        start: BattleScene.BGM_COMBAT_INTRO_SKIP_SEC,
-        config: { loop: true, volume: BattleScene.BGM_COMBAT_VOLUME }
-      });
+    const markerDef = {
+      name: marker,
+      start: BattleScene.BGM_COMBAT_INTRO_SKIP_SEC,
+      /** Sin `loop` nativo: en HTML5 `<audio loop>` ignora el marcador y vuelve al 0. */
+      config: { loop: false, volume: BattleScene.BGM_COMBAT_VOLUME }
+    };
+    if (music.markers[marker]) {
+      music.removeMarker(marker);
     }
+    music.addMarker(markerDef);
+    music.off(Phaser.Sound.Events.COMPLETE, this.onCombatBgmComplete);
+    music.on(Phaser.Sound.Events.COMPLETE, this.onCombatBgmComplete);
     const start = (): void => {
       if (music.isPlaying) {
         return;
@@ -150,7 +167,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private stopCombatMusic(): void {
-    this.sound.stopByKey(BattleScene.BGM_COMBAT_KEY);
+    const key = BattleScene.BGM_COMBAT_KEY;
+    const music = this.sound.get(key);
+    music?.off(Phaser.Sound.Events.COMPLETE, this.onCombatBgmComplete);
+    this.sound.stopByKey(key);
   }
 
   private buildFloor(): void {
