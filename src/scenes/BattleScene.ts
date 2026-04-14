@@ -1120,40 +1120,93 @@ export class BattleScene extends Phaser.Scene {
     const { width, height, isCompact } = this.getViewport();
     const centerX = width / 2;
     const centerY = height / 2;
-    const panelWidth = Math.min(width * 0.92, 920);
-    const panelHeight = Math.min(height * 0.62, 390);
-    const bg = this.add.rectangle(centerX, centerY, panelWidth, panelHeight, 0x02020a, 0.92).setDepth(2000);
+    const margin = isCompact ? 12 : 20;
+    const panelWidth = Math.min(width - margin * 2, 920);
+    const panelHeight = Math.min(
+      isCompact ? Math.max(300, Math.floor(height * 0.58)) : Math.min(height * 0.62, 400),
+      height - margin * 2
+    );
+    const useVerticalButtons = width < 560 || isCompact;
+    const depthDim = 8000;
+    const depthPanel = 8001;
+    const depthText = 8002;
+
+    const dim = this.add
+      .rectangle(centerX, centerY, width, height, 0x050810, 0.72)
+      .setDepth(depthDim)
+      .setScrollFactor(0);
+
+    const bg = this.add
+      .rectangle(centerX, centerY, panelWidth, panelHeight, 0x263043, 0.98)
+      .setStrokeStyle(3, 0xa8c8ff, 0.95)
+      .setDepth(depthPanel)
+      .setScrollFactor(0);
+
+    const titleSize = isCompact ? "22px" : "30px";
+    const subtitleSize = isCompact ? "16px" : "18px";
     const title = this.add
-      .text(centerX, centerY - panelHeight * 0.35, "Reclutamiento (cada 2 pisos)", {
-        fontSize: isCompact ? "20px" : "30px",
-        color: "#ffffff"
+      .text(centerX, centerY - panelHeight * 0.36, "Reclutamiento (cada 2 pisos)", {
+        fontSize: titleSize,
+        color: "#ffffff",
+        fontStyle: "bold",
+        align: "center",
+        wordWrap: { width: Math.max(120, panelWidth - 28) }
       })
       .setOrigin(0.5)
-      .setDepth(2001);
+      .setDepth(depthText)
+      .setScrollFactor(0);
+
     const subtitle = this.add
-      .text(centerX, centerY - panelHeight * 0.22, "Elige un personaje para sumar al equipo", {
-        fontSize: isCompact ? "14px" : "18px",
-        color: "#ffd37a"
+      .text(centerX, centerY - panelHeight * 0.2, "Elige un personaje para sumar al equipo", {
+        fontSize: subtitleSize,
+        color: "#ffe8b0",
+        align: "center",
+        wordWrap: { width: Math.max(120, panelWidth - 28) }
       })
       .setOrigin(0.5)
-      .setDepth(2001);
-    this.recruitmentOverlay = [bg, title, subtitle];
+      .setDepth(depthText)
+      .setScrollFactor(0);
+
+    this.recruitmentOverlay = [dim, bg, title, subtitle];
+
+    const btnFont = isCompact ? "19px" : "24px";
+    const padX = isCompact ? 18 : 14;
+    const padY = isCompact ? 14 : 10;
+    const total = options.length;
 
     options.forEach((role, index) => {
       const template = getTemplate(role);
-      const total = options.length;
-      const btnX = centerX + (index - (total - 1) / 2) * (isCompact ? 170 : 300);
-      const btnY = centerY + panelHeight * 0.03;
+      let btnX = centerX;
+      let btnY: number;
+      if (useVerticalButtons) {
+        const rowGap = Math.min(58, Math.max(48, Math.floor(panelHeight * 0.14)));
+        btnY = centerY - panelHeight * 0.02 + index * rowGap;
+      } else {
+        const colGap = Math.min(280, Math.max(200, Math.floor((panelWidth - 40) / Math.max(1, total - 0.4))));
+        btnX = centerX + (index - (total - 1) / 2) * colGap;
+        btnY = centerY + panelHeight * 0.14;
+      }
+
       const btn = this.add
-        .text(btnX, btnY, `[${index + 1}] ${template.nameEs}`, {
-          fontSize: isCompact ? "18px" : "24px",
-          color: "#0a0a0a",
-          backgroundColor: "#87f5b0",
-          padding: { x: isCompact ? 10 : 12, y: isCompact ? 6 : 8 }
+        .text(btnX, btnY, `${index + 1}. ${template.nameEs}`, {
+          fontSize: btnFont,
+          color: "#0d1118",
+          backgroundColor: "#7df0b2",
+          padding: { x: padX, y: padY },
+          align: "center",
+          wordWrap: { width: Math.max(100, panelWidth - 36) }
         })
-        .setDepth(2001)
+        .setDepth(depthText)
         .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
+        .setScrollFactor(0);
+      const hitW = Math.max(btn.width + 32, Math.min(panelWidth - 20, width - 28));
+      const hitH = Math.max(btn.height + 22, isCompact ? 52 : 46);
+      btn.setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(-hitW / 2, -hitH / 2, hitW, hitH),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+        useHandCursor: true
+      });
+
       btn.on("pointerdown", () => {
         const progress = createInitialProgress(role);
         progress.id = `${role}-${this.runState.roster.length + 1}`;
