@@ -50,9 +50,9 @@ export class HUD {
     this.scene = scene;
     this.onAbandon = onAbandon;
     this.onTypographyChanged = onTypographyChanged;
-    this.bottomPanel = scene.add.rectangle(0, 0, 10, 10, 0x081232, 0.96).setDepth(995).setOrigin(0);
-    this.partyPanel = scene.add.rectangle(0, 0, 10, 10, 0x0e1b40, 0.98).setDepth(996).setOrigin(0);
-    this.actionPanel = scene.add.rectangle(0, 0, 10, 10, 0x111d44, 0.98).setDepth(997).setOrigin(0);
+    this.bottomPanel = scene.add.rectangle(0, 0, 10, 10, 0x1b1d22, 0.97).setDepth(995).setOrigin(0);
+    this.partyPanel = scene.add.rectangle(0, 0, 10, 10, 0x24272d, 0.98).setDepth(996).setOrigin(0);
+    this.actionPanel = scene.add.rectangle(0, 0, 10, 10, 0x30343b, 0.98).setDepth(997).setOrigin(0);
     this.turnLabel = scene.add
       .text(16, 470, "", { fontSize: "18px", color: "#ffffff", wordWrap: { width: 920 } })
       .setDepth(1000);
@@ -60,14 +60,14 @@ export class HUD {
       .text(16, 500, "Listo", { fontSize: "16px", color: "#d2d2d2", wordWrap: { width: 980 } })
       .setDepth(1000);
     this.queueLabel = scene.add
-      .text(16, 16, "", { fontSize: "14px", color: "#89b4ff" })
+      .text(16, 16, "", { fontSize: "14px", color: "#d5d8df" })
       .setDepth(1000);
 
     this.historyButton = scene.add
       .text(890, 16, "Historial", {
         fontSize: "14px",
-        color: "#0f162b",
-        backgroundColor: "#89b4ff",
+        color: "#111214",
+        backgroundColor: "#c7ccd4",
         padding: { x: 10, y: 6 }
       })
       .setDepth(1100)
@@ -81,7 +81,7 @@ export class HUD {
       .text(760, 16, "Abandonar", {
         fontSize: "14px",
         color: "#ffffff",
-        backgroundColor: "#8f2433",
+        backgroundColor: "#6d3a3f",
         padding: { x: 10, y: 6 }
       })
       .setDepth(1100)
@@ -91,14 +91,14 @@ export class HUD {
       .text(640, 16, "⚙️", {
         fontSize: "20px",
         color: "#ffffff",
-        backgroundColor: "#22366b",
+        backgroundColor: "#4a4f58",
         padding: { x: 10, y: 4 }
       })
       .setDepth(1100)
       .setInteractive({ useHandCursor: true });
     this.settingsButton.on("pointerdown", () => this.toggleSettings(!this.settingsVisible));
 
-    this.historyPanelBg = scene.add.rectangle(775, 170, 480, 300, 0x050b1a, 0.92).setDepth(1090);
+    this.historyPanelBg = scene.add.rectangle(775, 170, 480, 300, 0x15171b, 0.94).setDepth(1090);
     this.historyPanelText = scene.add
       .text(545, 30, "Ultimos movimientos", {
         fontSize: "12px",
@@ -108,7 +108,7 @@ export class HUD {
       .setDepth(1091);
     this.historyPanelBg.setVisible(false);
     this.historyPanelText.setVisible(false);
-    this.settingsPanelBg = scene.add.rectangle(540, 170, 380, 250, 0x050b1a, 0.94).setDepth(1140);
+    this.settingsPanelBg = scene.add.rectangle(540, 170, 380, 250, 0x15171b, 0.96).setDepth(1140);
     this.settingsTitle = scene.add
       .text(540, 95, "Ajustes", {
         fontSize: "22px",
@@ -119,8 +119,8 @@ export class HUD {
     this.settingNormalBtn = scene.add
       .text(540, 140, "Tipografia: Normal", {
         fontSize: "16px",
-        color: "#0f172a",
-        backgroundColor: "#9dd1ff",
+        color: "#17191d",
+        backgroundColor: "#d4d8df",
         padding: { x: 10, y: 6 }
       })
       .setOrigin(0.5)
@@ -129,8 +129,8 @@ export class HUD {
     this.settingLargeBtn = scene.add
       .text(540, 185, "Tipografia: Grande", {
         fontSize: "16px",
-        color: "#0f172a",
-        backgroundColor: "#9dd1ff",
+        color: "#17191d",
+        backgroundColor: "#d4d8df",
         padding: { x: 10, y: 6 }
       })
       .setOrigin(0.5)
@@ -139,8 +139,8 @@ export class HUD {
     this.settingXLargeBtn = scene.add
       .text(540, 230, "Tipografia: Extra", {
         fontSize: "16px",
-        color: "#0f172a",
-        backgroundColor: "#9dd1ff",
+        color: "#17191d",
+        backgroundColor: "#d4d8df",
         padding: { x: 10, y: 6 }
       })
       .setOrigin(0.5)
@@ -150,7 +150,7 @@ export class HUD {
     this.settingLargeBtn.on("pointerdown", () => this.setTextMode("large"));
     this.settingXLargeBtn.on("pointerdown", () => this.setTextMode("xlarge"));
     this.toggleSettings(false);
-    this.confirmBg = scene.add.rectangle(512, 300, 560, 220, 0x050b1a, 0.96).setDepth(1200);
+    this.confirmBg = scene.add.rectangle(512, 300, 560, 220, 0x15171b, 0.97).setDepth(1200);
     this.confirmText = scene.add
       .text(512, 260, "¿Seguro que quieres abandonar esta partida?", {
         fontSize: "24px",
@@ -164,7 +164,7 @@ export class HUD {
       .text(440, 340, "Si, abandonar", {
         fontSize: "20px",
         color: "#171717",
-        backgroundColor: "#ff8a8a",
+        backgroundColor: "#d8a4a4",
         padding: { x: 12, y: 8 }
       })
       .setDepth(1201)
@@ -174,7 +174,7 @@ export class HUD {
       .text(585, 340, "No", {
         fontSize: "20px",
         color: "#171717",
-        backgroundColor: "#8cf7b6",
+        backgroundColor: "#b4d8c2",
         padding: { x: 16, y: 8 }
       })
       .setDepth(1201)
@@ -214,7 +214,9 @@ export class HUD {
   }
 
   setQueue(value: string): void {
-    this.queueLabel.setText(value);
+    const maxChars = this.scene.scale.width < 760 ? 28 : 64;
+    const clipped = value.length > maxChars ? `${value.slice(0, maxChars - 1)}...` : value;
+    this.queueLabel.setText(clipped);
   }
 
   clearSkillButtons(): void {
@@ -256,8 +258,8 @@ export class HUD {
     sortedUnits.forEach((hero, index) => {
       const x = startX + index * (cardWidth + 8);
       const card = this.scene.add
-        .rectangle(x, centerY, cardWidth, cardHeight, 0x1c315e, 0.98)
-        .setStrokeStyle(2, 0x8cc8ff)
+        .rectangle(x, centerY, cardWidth, cardHeight, 0x3a3e46, 0.98)
+        .setStrokeStyle(2, 0xb6bbc4)
         .setDepth(1001);
       if (hero.isAlive) {
         card.setInteractive({ useHandCursor: true });
@@ -270,10 +272,23 @@ export class HUD {
 
       const textureKey = this.getPortraitTextureKey(hero);
       if (textureKey && this.scene.textures.exists(textureKey)) {
-        const icon = this.scene.add
-          .image(x - cardWidth * 0.32, centerY - 2, textureKey)
-          .setDisplaySize(cardHeight * 0.7, cardHeight * 0.7)
+        const portraitRadius = Math.floor(cardHeight * 0.36);
+        const iconX = x - cardWidth * 0.32;
+        const iconY = centerY - 2;
+        const ring = this.scene.add
+          .circle(iconX, iconY, portraitRadius + 3, 0x17191d, 1)
+          .setStrokeStyle(2, 0xc4c9d2)
           .setDepth(1002);
+        this.partyWidgets.push(ring);
+        const icon = this.scene.add
+          .image(iconX, iconY, textureKey)
+          .setDisplaySize(portraitRadius * 2, portraitRadius * 2)
+          .setDepth(1003);
+        const iconMask = this.scene.add.graphics({ x: 0, y: 0 }).setVisible(false);
+        iconMask.fillStyle(0xffffff);
+        iconMask.fillCircle(iconX, iconY, portraitRadius);
+        icon.setMask(iconMask.createGeometryMask());
+        this.partyWidgets.push(iconMask);
         if (!hero.isAlive) {
           icon.setAlpha(0.45);
         }
@@ -307,7 +322,7 @@ export class HUD {
       return;
     }
     const flash = this.scene.add
-      .rectangle(card.x, card.y, card.width, card.height, 0xff5f5f, 0.28)
+      .rectangle(card.x, card.y, card.width, card.height, 0xf0b4b4, 0.28)
       .setDepth(1010);
     this.partyWidgets.push(flash);
     this.scene.tweens.add({
@@ -347,20 +362,20 @@ export class HUD {
       const x = marginX + col * (buttonWidth + gapX);
       const y = metrics.actionTop + 10 + row * (buttonHeight + gapY);
       const rect = this.scene.add
-        .rectangle(x + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 0x22356e, 1)
-        .setStrokeStyle(2, 0x8cc8ff)
+        .rectangle(x + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 0x474c55, 1)
+        .setStrokeStyle(2, 0xc0c5ce)
         .setDepth(1000)
         .setInteractive({ useHandCursor: true });
       const text = this.scene.add
         .text(x + 8, y + 8, `[${index + 1}] ${skill.nameEs}`, {
           fontSize: `${(isCompact ? 16 : 19) * this.textScale}px`,
-          color: "#f8f9ff",
+          color: "#f4f5f7",
           wordWrap: { width: buttonWidth - 16 }
         })
         .setDepth(1001);
       rect.on("pointerdown", () => onClick(skill));
-      rect.on("pointerover", () => rect.setFillStyle(0x2d4a97, 1));
-      rect.on("pointerout", () => rect.setFillStyle(0x22356e, 1));
+      rect.on("pointerover", () => rect.setFillStyle(0x565c67, 1));
+      rect.on("pointerout", () => rect.setFillStyle(0x474c55, 1));
       this.skillButtons.push(rect, text);
     });
 
@@ -368,8 +383,8 @@ export class HUD {
       const placeholder = this.scene.add
         .text(marginX, metrics.actionTop + 12, "Esperando turno...", {
           fontSize: `${(isCompact ? 16 : 19) * this.textScale}px`,
-          color: "#9db0db",
-          backgroundColor: "#1a2238",
+          color: "#e0e3e9",
+          backgroundColor: "#434852",
           padding: { x: 12 * this.textScale, y: 8 * this.textScale }
         })
         .setDepth(1000);
@@ -478,9 +493,9 @@ export class HUD {
     const partyRowHeight = Math.max(96, Math.round(76 + 20 * this.textScale));
     const infoHeight = Math.max(Math.round(76 + 26 * this.textScale), isCompact ? 104 : 120);
     const actionTop = panelTop + controlsHeight + partyRowHeight + infoHeight;
-    const queueSize = (isCompact ? 13 : 16) * this.textScale;
-    const turnSize = (isCompact ? 16 : 20) * this.textScale;
-    const logSize = (isCompact ? 14 : 18) * this.textScale;
+    const queueSize = Math.min((isCompact ? 12 : 14) * this.textScale, isCompact ? 16 : 20);
+    const turnSize = Math.min((isCompact ? 15 : 18) * this.textScale, isCompact ? 24 : 32);
+    const logSize = Math.min((isCompact ? 13 : 16) * this.textScale, isCompact ? 22 : 28);
     return {
       width,
       height,

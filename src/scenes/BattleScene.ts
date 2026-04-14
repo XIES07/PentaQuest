@@ -22,11 +22,12 @@ import { SCENE_GAME_OVER, SCENE_SELECTION } from "./SceneKeys";
 type TurnPhase = "idle" | "player_select_skill" | "player_select_target" | "enemy_action" | "resolving";
 
 interface VisualNode {
-  body: Phaser.GameObjects.Rectangle;
+  body: Phaser.GameObjects.Shape;
   icon: Phaser.GameObjects.Text | Phaser.GameObjects.Image;
   name: Phaser.GameObjects.Text;
   hp: Phaser.GameObjects.Text;
   targetZone: Phaser.GameObjects.Rectangle;
+  iconMask?: Phaser.GameObjects.Graphics;
 }
 
 export class BattleScene extends Phaser.Scene {
@@ -78,7 +79,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor("#12172e");
+    this.cameras.main.setBackgroundColor("#23262c");
     this.hud = new HUD(
       this,
       () => this.abandonRun(),
@@ -165,6 +166,7 @@ export class BattleScene extends Phaser.Scene {
       node.name.destroy();
       node.hp.destroy();
       node.targetZone.destroy();
+      node.iconMask?.destroy();
     });
     this.visuals.clear();
 
@@ -182,10 +184,19 @@ export class BattleScene extends Phaser.Scene {
     this.visuals.forEach((node) => {
       if (node.body.y > battleHeight - 25) {
         node.body.y = battleHeight - 25;
-        node.icon.y = node.body.y - 10;
-        node.name.y = node.body.y + 78;
-        node.hp.y = node.body.y - 96;
+        node.icon.y = node.body.y;
+        node.name.y = node.body.y + 84;
+        node.hp.y = node.body.y - 86;
         node.targetZone.y = node.body.y;
+        node.iconMask?.destroy();
+        if (node.icon instanceof Phaser.GameObjects.Image) {
+          const iconMask = this.add.graphics({ x: 0, y: 0 }).setVisible(false);
+          const radius = Math.floor(node.icon.displayWidth * 0.48);
+          iconMask.fillStyle(0xffffff);
+          iconMask.fillCircle(node.icon.x, node.icon.y, radius);
+          node.icon.setMask(iconMask.createGeometryMask());
+          node.iconMask = iconMask;
+        }
       }
       if (node.body.x < 40) {
         const delta = 40 - node.body.x;
@@ -214,26 +225,25 @@ export class BattleScene extends Phaser.Scene {
     visualScale = 1
   ): void {
     const typographyScale = this.getTypographyScale();
-    const bodyWidth = Math.round(118 * visualScale);
-    const bodyHeight = Math.round(138 * visualScale);
+    const bodySize = Math.round(124 * visualScale);
     const iconSize = this.getIconDisplaySize(character, visualScale);
     const nameSize = Math.max(11, Math.round(13 * visualScale * typographyScale));
     const hpSize = Math.max(11, Math.round(13 * visualScale * typographyScale));
-    const targetWidth = Math.round(112 * visualScale);
-    const targetHeight = Math.round(132 * visualScale);
+    const targetWidth = Math.round(124 * visualScale);
+    const targetHeight = Math.round(124 * visualScale);
 
     const body = this.add
-      .rectangle(x, y, bodyWidth, bodyHeight, color, 0.62)
-      .setStrokeStyle(3, 0x89b4ff)
+      .circle(x, y, Math.floor(bodySize * 0.5), 0x2f333a, 0.58)
+      .setStrokeStyle(2, 0xbec4cf)
       .setDepth(30);
     const textureKey = this.getTextureKey(character);
-    const icon = this.createIconVisual(textureKey, emoji, x, y - 10 * visualScale, iconSize);
+    const { icon, iconMask } = this.createIconVisual(textureKey, emoji, x, y, iconSize);
     const name = this.add
-      .text(x, y + 78 * visualScale, character.name, { fontSize: `${nameSize}px`, color: "#ffffff" })
+      .text(x, y + 84 * visualScale, character.name, { fontSize: `${nameSize}px`, color: "#eceef2" })
       .setOrigin(0.5)
       .setDepth(32);
     const hp = this.add
-      .text(x, y - 96 * visualScale, `${character.stats.hp}/${character.stats.maxHp}`, {
+      .text(x, y - 86 * visualScale, `${character.stats.hp}/${character.stats.maxHp}`, {
         fontSize: `${hpSize}px`,
         color: "#9df2b5"
       })
@@ -244,7 +254,7 @@ export class BattleScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setDepth(60);
     targetZone.on("pointerdown", () => this.onTargetClick(character));
-    this.visuals.set(character.id, { body, icon, name, hp, targetZone });
+    this.visuals.set(character.id, { body, icon, name, hp, targetZone, iconMask });
     this.paintCharacterState(character);
   }
 
@@ -267,14 +277,20 @@ export class BattleScene extends Phaser.Scene {
     x: number,
     y: number,
     iconSize: number
-  ): Phaser.GameObjects.Text | Phaser.GameObjects.Image {
+  ): { icon: Phaser.GameObjects.Text | Phaser.GameObjects.Image; iconMask?: Phaser.GameObjects.Graphics } {
     if (textureKey && this.textures.exists(textureKey)) {
-      return this.add.image(x, y, textureKey).setDisplaySize(iconSize, iconSize).setDepth(31);
+      const icon = this.add.image(x, y, textureKey).setDisplaySize(iconSize, iconSize).setDepth(31);
+      const iconMask = this.add.graphics({ x: 0, y: 0 }).setVisible(false);
+      iconMask.fillStyle(0xffffff);
+      iconMask.fillCircle(x, y, Math.floor(iconSize * 0.48));
+      icon.setMask(iconMask.createGeometryMask());
+      return { icon, iconMask };
     }
-    return this.add
+    const icon = this.add
       .text(x, y, fallbackEmoji, { fontSize: `${iconSize}px` })
       .setOrigin(0.5)
       .setDepth(31);
+    return { icon };
   }
 
   private getEnemyLayout(count: number): Array<{ x: number; y: number; scale: number }> {
@@ -753,6 +769,7 @@ export class BattleScene extends Phaser.Scene {
         node.name.destroy();
         node.hp.destroy();
         node.targetZone.destroy();
+        node.iconMask?.destroy();
         this.visuals.delete(id);
         removedAny = true;
       }
@@ -1082,6 +1099,7 @@ export class BattleScene extends Phaser.Scene {
       node.name.destroy();
       node.hp.destroy();
       node.targetZone.destroy();
+      node.iconMask?.destroy();
       this.visuals.delete(id);
     });
   }
