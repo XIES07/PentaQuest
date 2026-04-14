@@ -85,15 +85,18 @@ export class BattleScene extends Phaser.Scene {
 
   private createMainWaveEnemy(kind: EnemyKind, name: string, ratio: number): Enemy {
     const base = getEnemyStatsByFloor(this.runState.floor);
+    const difficultyMultiplier = this.getRosterDifficultyMultiplier();
     return new Enemy(
       `enemy-main-${this.enemyCounter++}`,
       name,
       {
         ...base,
-        maxHp: Math.round(base.maxHp * ratio),
-        hp: Math.round(base.maxHp * ratio),
-        attack: Math.round(base.attack * ratio),
-        defense: Math.round(base.defense * (1 + (ratio - 1) * 0.45))
+        maxHp: Math.round(base.maxHp * ratio * difficultyMultiplier),
+        hp: Math.round(base.maxHp * ratio * difficultyMultiplier),
+        attack: Math.round(base.attack * ratio * difficultyMultiplier),
+        defense: Math.round(base.defense * (1 + (ratio - 1) * 0.45) * difficultyMultiplier),
+        magic: Math.round(base.magic * ratio * difficultyMultiplier),
+        speed: Math.round(base.speed * (1 + (difficultyMultiplier - 1) * 0.18))
       },
       kind,
       true
@@ -711,9 +714,12 @@ export class BattleScene extends Phaser.Scene {
 
   private createSummonEnemy(kind: EnemyKind, source?: Enemy): Enemy {
     const base = getEnemyStatsByFloor(this.runState.floor);
+    const difficultyMultiplier = this.getRosterDifficultyMultiplier();
     if (kind === "slime_blob") {
-      const hpBase = source ? Math.max(1, Math.round(source.stats.hp * 0.15)) : Math.round(base.maxHp * 0.2);
-      const attack = source?.baseAttackSnapshot ?? Math.round(base.attack * 0.7);
+      const hpBase = source
+        ? Math.max(1, Math.round(source.stats.hp * 0.15))
+        : Math.round(base.maxHp * 0.2 * difficultyMultiplier);
+      const attack = source?.baseAttackSnapshot ?? Math.round(base.attack * 0.7 * difficultyMultiplier);
       return new Enemy(
         `enemy-summon-${this.enemyCounter++}`,
         "Bola de Slime",
@@ -722,8 +728,8 @@ export class BattleScene extends Phaser.Scene {
           hp: hpBase,
           attack,
           magic: 0,
-          defense: Math.max(2, Math.round(base.defense * 0.35)),
-          speed: Math.round(base.speed * 1.05),
+          defense: Math.max(2, Math.round(base.defense * 0.35 * difficultyMultiplier)),
+          speed: Math.round(base.speed * (1.05 + (difficultyMultiplier - 1) * 0.12)),
           healPower: 0
         },
         "slime_blob",
@@ -734,17 +740,24 @@ export class BattleScene extends Phaser.Scene {
       `enemy-summon-${this.enemyCounter++}`,
       "Esqueleto",
       {
-        maxHp: Math.round(base.maxHp * 0.4),
-        hp: Math.round(base.maxHp * 0.4),
-        attack: Math.round(base.attack * 0.65),
+        maxHp: Math.round(base.maxHp * 0.4 * difficultyMultiplier),
+        hp: Math.round(base.maxHp * 0.4 * difficultyMultiplier),
+        attack: Math.round(base.attack * 0.65 * difficultyMultiplier),
         magic: 0,
-        defense: Math.round(base.defense * 0.45),
-        speed: Math.round(base.speed * 1.1),
+        defense: Math.round(base.defense * 0.45 * difficultyMultiplier),
+        speed: Math.round(base.speed * (1.1 + (difficultyMultiplier - 1) * 0.12)),
         healPower: 0
       },
       "skeleton_minion",
       false
     );
+  }
+
+  private getRosterDifficultyMultiplier(): number {
+    const rosterSize = Math.max(1, this.runState.roster.length);
+    // Escala agresiva por cantidad de heroes: 1 heroe => x1, 4+ heroes => x2.
+    const growthPerHero = 0.35;
+    return Math.min(2, 1 + (rosterSize - 1) * growthPerHero);
   }
 
   private onEnemyDefeated(): void {
