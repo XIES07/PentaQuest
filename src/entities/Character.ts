@@ -8,6 +8,10 @@ export abstract class Character {
   isAlive = true;
   tauntTurns = 0;
   battleDefenseBonus = 0;
+  thornsTurns = 0;
+  thornsReflectRatio = 0;
+  evadeTurns = 0;
+  evadeChance = 0;
 
   protected constructor(id: string, name: string, team: Team, stats: StatBlock) {
     this.id = id;

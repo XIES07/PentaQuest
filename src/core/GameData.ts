@@ -24,8 +24,8 @@ const TEMPLATES: Record<Role, RoleTemplate> = {
     nameEs: "Espadachin",
     nameEn: "Swordsman",
     baseStats: { maxHp: 620, hp: 620, attack: 72, magic: 10, defense: 25, speed: 14, healPower: 0 },
-    baseSkillIds: ["slash", "execute"],
-    unlockableSkillIds: ["whirlwind"]
+    baseSkillIds: ["slash", "whirlwind"],
+    unlockableSkillIds: ["execute"]
   },
   tank: {
     role: "tank",
@@ -134,10 +134,10 @@ export const SKILL_META: Record<string, SkillMeta> = {
   },
   revive_light: {
     id: "revive_light",
-    nameEs: "Luz Vital",
-    nameEn: "Revive Light",
-    descriptionEs: "Resucita a un aliado.",
-    descriptionEn: "Resurrect one ally."
+    nameEs: "Luz Vampirica",
+    nameEn: "Vampiric Light",
+    descriptionEs: "Drena vida de un enemigo y cura al lanzador.",
+    descriptionEn: "Drains life from one enemy and heals the caster."
   },
   wing_pulse: {
     id: "wing_pulse",
@@ -150,8 +150,8 @@ export const SKILL_META: Record<string, SkillMeta> = {
     id: "precise_shot",
     nameEs: "Disparo Preciso",
     nameEn: "Precise Shot",
-    descriptionEs: "Dano fisico puntual.",
-    descriptionEn: "Single physical damage."
+    descriptionEs: "Dano puntual y 50% de evasion por 1 turno.",
+    descriptionEn: "Single damage and 50% evasion for 1 turn."
   },
   rainbow_arrow: {
     id: "rainbow_arrow",

@@ -83,7 +83,13 @@ export const SKILLS: Record<string, ISkill> = {
   }),
   taunt: new BasicSkill("taunt", "self", ({ caster }) => {
     caster.tauntTurns = 1;
-    return { logs: [`${caster.name} provoca y atrae el aggro enemigo.`] };
+    caster.thornsTurns = 1;
+    caster.thornsReflectRatio = 0.35;
+    return {
+      logs: [
+        `${caster.name} provoca y activa Espinas (devuelve 35% del dano recibido durante 1 turno).`
+      ]
+    };
   }),
   fortify: new BasicSkill("fortify", "all_allies", ({ caster, allies }) => {
     allies.filter((a) => a.isAlive).forEach((ally) => {
@@ -110,20 +116,18 @@ export const SKILLS: Record<string, ISkill> = {
     const healed = t.heal(Math.round(caster.stats.healPower * 1.15));
     return { logs: [`${caster.name} cura a ${t.name} por ${healed}.`] };
   }),
-  revive_light: new BasicSkill(
-    "revive_light",
-    "single_ally",
-    ({ caster, targets }) => {
-      const t = targets[0];
-      if (!t) return { logs: [] };
-      if (t.resurrect(0.35)) {
-        return { logs: [`${caster.name} resucita a ${t.name}.`] };
-      }
-      const healed = t.heal(Math.round(caster.stats.healPower * 0.9));
-      return { logs: [`${caster.name} canaliza Luz Vital y cura ${healed}.`] };
-    },
-    ({ allies }) => allies.some((a) => !a.isAlive) || allies.some((a) => a.stats.hp < a.stats.maxHp)
-  ),
+  revive_light: new BasicSkill("revive_light", "single_enemy", ({ caster, targets }) => {
+    const t = targets[0];
+    if (!t) return { logs: [] };
+    const dealt = damage(caster, t, 1.05, true);
+    const lifesteal = Math.max(1, Math.round(dealt * 0.6));
+    const healed = caster.heal(lifesteal);
+    return {
+      logs: [
+        `${caster.name} drena a ${t.name} por ${dealt} y recupera ${healed} HP (robo de vida).`
+      ]
+    };
+  }),
   wing_pulse: new BasicSkill("wing_pulse", "all_allies", ({ caster, allies }) => {
     const logs: string[] = [];
     allies.filter((a) => a.isAlive).forEach((ally) => {
@@ -136,7 +140,9 @@ export const SKILLS: Record<string, ISkill> = {
     const t = targets[0];
     if (!t) return { logs: [] };
     const dealt = damage(caster, t, 1.15);
-    return { logs: [`${caster.name} dispara a ${t.name} por ${dealt}.`] };
+    caster.evadeTurns = 1;
+    caster.evadeChance = 0.5;
+    return { logs: [`${caster.name} dispara a ${t.name} por ${dealt} y gana 50% de evasion por 1 turno.`] };
   }),
   rainbow_arrow: new BasicSkill("rainbow_arrow", "all_enemies", ({ caster, enemies }) => {
     const logs: string[] = [];

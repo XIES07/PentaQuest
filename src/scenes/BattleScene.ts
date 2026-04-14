@@ -49,6 +49,7 @@ export class BattleScene extends Phaser.Scene {
   private actorInTurn: Character | null = null;
   private recruitmentOverlay: Phaser.GameObjects.GameObject[] = [];
   private summonCooldownByCasterId = new Map<string, number>();
+  private skeletonSummonCooldownByEnemyId = new Map<string, number>();
 
   constructor() {
     super("battle");
@@ -74,8 +75,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private buildFloor(): void {
+    this.normalizeRosterSkillLoadout();
     this.players = this.runState.roster.map((progress) => new Player(progress));
     this.summonCooldownByCasterId.clear();
+    this.skeletonSummonCooldownByEnemyId.clear();
     this.enemyCounter = 1;
 
     this.enemyWave = [
@@ -88,20 +91,46 @@ export class BattleScene extends Phaser.Scene {
     this.renderCurrentWaveVisuals();
   }
 
+  private normalizeRosterSkillLoadout(): void {
+    this.runState.roster.forEach((progress) => {
+      if (progress.role !== "swordsman") {
+        return;
+      }
+      const hasSlash = progress.unlockedSkillIds.includes("slash");
+      const hasExecute = progress.unlockedSkillIds.includes("execute");
+      const hasWhirlwind = progress.unlockedSkillIds.includes("whirlwind");
+      if (hasSlash && hasExecute && hasWhirlwind) {
+        progress.unlockedSkillIds = ["slash", "whirlwind", "execute"];
+        return;
+      }
+      if (hasSlash && hasExecute && !hasWhirlwind) {
+        progress.unlockedSkillIds = ["slash", "execute"];
+        return;
+      }
+      if (hasSlash && !hasExecute && hasWhirlwind) {
+        progress.unlockedSkillIds = ["slash", "whirlwind"];
+      }
+    });
+  }
+
   private createMainWaveEnemy(kind: EnemyKind, name: string, ratio: number): Enemy {
     const base = getEnemyStatsByFloor(this.runState.floor);
     const difficultyMultiplier = this.getRosterDifficultyMultiplier();
+    const unitNerf = kind === "demon" ? 0.5 : 1;
     return new Enemy(
       `enemy-main-${this.enemyCounter++}`,
       name,
       {
         ...base,
-        maxHp: Math.round(base.maxHp * ratio * difficultyMultiplier),
-        hp: Math.round(base.maxHp * ratio * difficultyMultiplier),
-        attack: Math.round(base.attack * ratio * difficultyMultiplier),
-        defense: Math.round(base.defense * (1 + (ratio - 1) * 0.45) * difficultyMultiplier),
-        magic: Math.round(base.magic * ratio * difficultyMultiplier),
-        speed: Math.round(base.speed * (1 + (difficultyMultiplier - 1) * 0.18))
+        maxHp: Math.max(1, Math.round(base.maxHp * ratio * difficultyMultiplier * unitNerf)),
+        hp: Math.max(1, Math.round(base.maxHp * ratio * difficultyMultiplier * unitNerf)),
+        attack: Math.max(1, Math.round(base.attack * ratio * difficultyMultiplier * unitNerf)),
+        defense: Math.max(
+          1,
+          Math.round(base.defense * (1 + (ratio - 1) * 0.45) * difficultyMultiplier * unitNerf)
+        ),
+        magic: Math.max(0, Math.round(base.magic * ratio * difficultyMultiplier * unitNerf)),
+        speed: Math.max(1, Math.round(base.speed * (1 + (difficultyMultiplier - 1) * 0.18) * unitNerf))
       },
       kind,
       true
@@ -381,9 +410,51 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onSkillSelected(skill: ISkill): void {
-    if (this.phase !== "player_select_skill" || !this.actorInTurn) return;
+    if (
+      (this.phase !== "player_select_skill" && this.phase !== "player_select_target") ||
+      !this.actorInTurn ||
+      !(this.actorInTurn instanceof Player)
+    ) {
+      return;
+    }
+
+    const wasTargetSelection = this.phase === "player_select_target";
+    const wasSameSkill = this.selectedSkill?.id === skill.id;
     this.selectedSkill = skill;
     const actor = this.actorInTurn as Player;
+    const allies = this.players;
+    const enemies = this.enemies.filter((enemy) => enemy.isAlive);
+    const context: SkillContext = { caster: actor, allies, enemies, targets: [] };
+
+    if (!skill.canUse(context)) {
+      this.hud.setLog("No puedes usar esta habilidad en este momento.");
+      return;
+    }
+
+    if (skill.targetType === "single_enemy") {
+      this.phase = "player_select_target";
+      this.hud.setLog(
+        `${skill.nameEs}: ${skill.descriptionEs} Apunta a un enemigo o elige otra habilidad.`
+      );
+      return;
+    }
+
+    if (skill.targetType === "single_ally") {
+      this.phase = "player_select_target";
+      this.hud.setLog(
+        `${skill.nameEs}: ${skill.descriptionEs} Apunta a un aliado o elige otra habilidad.`
+      );
+      return;
+    }
+
+    this.phase = "player_select_target";
+    if (!wasTargetSelection || !wasSameSkill) {
+      this.hud.setLog(
+        `${skill.nameEs}: ${skill.descriptionEs} Haz click otra vez en la misma habilidad para confirmar o elige otra.`
+      );
+      return;
+    }
+
     if (skill.id === "summon_storm" && actor.progress.role === "mage") {
       const cooldown = this.summonCooldownByCasterId.get(actor.id) ?? 0;
       if (cooldown > 0) {
@@ -400,13 +471,6 @@ export class BattleScene extends Phaser.Scene {
       this.resolveMageSummon(actor);
       return;
     }
-    const allies = this.players;
-    const enemies = this.enemies.filter((enemy) => enemy.isAlive);
-    const context: SkillContext = { caster: actor, allies, enemies, targets: [] };
-    if (!skill.canUse(context)) {
-      this.hud.setLog("No puedes usar esta habilidad en este momento.");
-      return;
-    }
 
     if (skill.targetType === "self") {
       this.resolvePlayerAction([actor]);
@@ -421,19 +485,14 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
 
-    this.phase = "player_select_target";
-    if (skill.targetType === "single_enemy") {
-      this.hud.setLog("Selecciona un enemigo.");
-    } else {
-      this.hud.setLog("Selecciona un aliado.");
-    }
+    this.hud.setLog("Selecciona un objetivo valido o elige otra habilidad.");
   }
 
   private onTargetClick(target: Character): void {
     if (this.phase !== "player_select_target" || !this.selectedSkill || !this.actorInTurn) {
       return;
     }
-    if (!target.isAlive && this.selectedSkill.id !== "revive_light") {
+    if (!target.isAlive) {
       return;
     }
     if (this.selectedSkill.targetType === "single_enemy" && target.team !== "enemy") {
@@ -583,8 +642,16 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private runEnemyAction(enemy: Enemy): void {
-    if (enemy.kind === "skeleton_mage" && this.shouldSkeletonMageSummon()) {
+    if (enemy.kind === "skeleton_mage") {
+      const currentCooldown = this.skeletonSummonCooldownByEnemyId.get(enemy.id) ?? 0;
+      if (currentCooldown > 0) {
+        this.skeletonSummonCooldownByEnemyId.set(enemy.id, currentCooldown - 1);
+      }
+    }
+
+    if (enemy.kind === "skeleton_mage" && this.shouldSkeletonMageSummon(enemy)) {
       const logs = this.summonSkeletonMinions();
+      this.skeletonSummonCooldownByEnemyId.set(enemy.id, 3);
       this.afterAction(logs, 1400, enemy, []);
       return;
     }
@@ -612,9 +679,27 @@ export class BattleScene extends Phaser.Scene {
       this.finishRun();
       return;
     }
+    if (target.evadeTurns > 0) {
+      target.evadeTurns -= 1;
+      const dodged = Math.random() < target.evadeChance;
+      target.evadeChance = 0;
+      if (dodged) {
+        if (target.tauntTurns > 0) target.tauntTurns -= 1;
+        this.afterAction([`${target.name} evade el ataque de ${enemy.name}.`], 1400, enemy, [target]);
+        return;
+      }
+    }
+
     const dealt = target.receiveDamage(Math.round(enemy.stats.attack * (0.9 + Math.random() * 0.3)));
+    const logs = [`${enemy.name} ataca a ${target.name} por ${dealt}.`];
     if (target.tauntTurns > 0) target.tauntTurns -= 1;
-    this.afterAction([`${enemy.name} ataca a ${target.name} por ${dealt}.`], 1400, enemy, [target]);
+    if (target.thornsTurns > 0 && target.thornsReflectRatio > 0 && enemy.isAlive) {
+      const reflected = enemy.receiveDamage(Math.max(1, Math.round(dealt * target.thornsReflectRatio)));
+      target.thornsTurns -= 1;
+      target.thornsReflectRatio = 0;
+      logs.push(`Espinas de ${target.name} devuelve ${reflected} a ${enemy.name}.`);
+    }
+    this.afterAction(logs, 1400, enemy, [target]);
   }
 
   private afterAction(logs: string[], delay = 1400, actor?: Character, targets: Character[] = []): void {
@@ -665,6 +750,11 @@ export class BattleScene extends Phaser.Scene {
     });
     const before = this.enemies.length;
     this.enemies = this.enemies.filter((enemy) => enemy.isAlive);
+    Array.from(this.skeletonSummonCooldownByEnemyId.keys()).forEach((enemyId) => {
+      if (!aliveIds.has(enemyId)) {
+        this.skeletonSummonCooldownByEnemyId.delete(enemyId);
+      }
+    });
     const beforePlayers = this.players.length;
     this.players = this.players.filter((player) => !(player instanceof SummonAlly && !player.isAlive));
     return removedAny || before !== this.enemies.length || beforePlayers !== this.players.length;
@@ -694,8 +784,12 @@ export class BattleScene extends Phaser.Scene {
     return spawnedLogs;
   }
 
-  private shouldSkeletonMageSummon(): boolean {
+  private shouldSkeletonMageSummon(enemy: Enemy): boolean {
     if (this.enemies.length >= this.maxEnemiesOnField) {
+      return false;
+    }
+    const cooldown = this.skeletonSummonCooldownByEnemyId.get(enemy.id) ?? 0;
+    if (cooldown > 0) {
       return false;
     }
     return Math.random() < 0.7;
@@ -761,6 +855,7 @@ export class BattleScene extends Phaser.Scene {
     const base = getEnemyStatsByFloor(this.runState.floor);
     const difficultyMultiplier = this.getRosterDifficultyMultiplier();
     const supportPower = 1.35;
+    const demonSupportNerf = 0.5;
     const roll = Math.random();
 
     if (roll < 0.5) {
@@ -768,12 +863,12 @@ export class BattleScene extends Phaser.Scene {
         `enemy-summon-${this.enemyCounter++}`,
         "Slime Alfa",
         {
-          maxHp: Math.round(base.maxHp * 0.95 * difficultyMultiplier * supportPower),
-          hp: Math.round(base.maxHp * 0.95 * difficultyMultiplier * supportPower),
-          attack: Math.round(base.attack * 0.9 * difficultyMultiplier * supportPower),
+          maxHp: Math.max(1, Math.round(base.maxHp * 0.95 * difficultyMultiplier * supportPower * demonSupportNerf)),
+          hp: Math.max(1, Math.round(base.maxHp * 0.95 * difficultyMultiplier * supportPower * demonSupportNerf)),
+          attack: Math.max(1, Math.round(base.attack * 0.9 * difficultyMultiplier * supportPower * demonSupportNerf)),
           magic: 0,
-          defense: Math.round(base.defense * 0.85 * difficultyMultiplier * supportPower),
-          speed: Math.round(base.speed * 1.05),
+          defense: Math.max(1, Math.round(base.defense * 0.85 * difficultyMultiplier * supportPower * demonSupportNerf)),
+          speed: Math.max(1, Math.round(base.speed * 1.05 * demonSupportNerf)),
           healPower: 0
         },
         "slime",
@@ -785,12 +880,12 @@ export class BattleScene extends Phaser.Scene {
       `enemy-summon-${this.enemyCounter++}`,
       "Mago Esqueleto Elite",
       {
-        maxHp: Math.round(base.maxHp * 1.05 * difficultyMultiplier * supportPower),
-        hp: Math.round(base.maxHp * 1.05 * difficultyMultiplier * supportPower),
-        attack: Math.round(base.attack * 0.95 * difficultyMultiplier * supportPower),
-        magic: Math.round(base.magic * 1.1 * difficultyMultiplier * supportPower),
-        defense: Math.round(base.defense * 0.9 * difficultyMultiplier * supportPower),
-        speed: Math.round(base.speed * 1.02),
+        maxHp: Math.max(1, Math.round(base.maxHp * 1.05 * difficultyMultiplier * supportPower * demonSupportNerf)),
+        hp: Math.max(1, Math.round(base.maxHp * 1.05 * difficultyMultiplier * supportPower * demonSupportNerf)),
+        attack: Math.max(1, Math.round(base.attack * 0.95 * difficultyMultiplier * supportPower * demonSupportNerf)),
+        magic: Math.max(0, Math.round(base.magic * 1.1 * difficultyMultiplier * supportPower * demonSupportNerf)),
+        defense: Math.max(1, Math.round(base.defense * 0.9 * difficultyMultiplier * supportPower * demonSupportNerf)),
+        speed: Math.max(1, Math.round(base.speed * 1.02 * demonSupportNerf)),
         healPower: 0
       },
       "skeleton_mage",
