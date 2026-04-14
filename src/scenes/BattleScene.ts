@@ -65,6 +65,11 @@ export class BattleScene extends Phaser.Scene {
   private skeletonSummonCooldownByEnemyId = new Map<string, number>();
   private pendingTurnGateMs = 0;
 
+  private static readonly BGM_COMBAT_KEY = "bgm_combat";
+  private static readonly BGM_COMBAT_MARKER = "combat_loop";
+  private static readonly BGM_COMBAT_INTRO_SKIP_SEC = 15;
+  private static readonly BGM_COMBAT_VOLUME = 0.1;
+
   constructor() {
     super("battle");
   }
@@ -96,10 +101,13 @@ export class BattleScene extends Phaser.Scene {
     this.load.audio(SFX.SWORD, "/assets/efects/Sonido De espada Sonido Edit.mp3");
     this.load.audio(SFX.FIREBALL, "/assets/efects/sound effect  de gran bola de fuego.mp3");
     this.load.audio(SFX.ARROW, "/assets/efects/ARCO Y FLECHA efecto de sonido.mp3");
+    this.load.audio(BattleScene.BGM_COMBAT_KEY, "/assets/songs/combat/combate%20music.mp3");
   }
 
   create(): void {
     this.cameras.main.setBackgroundColor("#23262c");
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.stopCombatMusic, this);
+    this.startCombatMusic();
     this.hud = new HUD(
       this,
       () => this.abandonRun(),
@@ -112,6 +120,37 @@ export class BattleScene extends Phaser.Scene {
       this.hud.layout();
       this.renderCurrentWaveVisuals();
     });
+  }
+
+  private startCombatMusic(): void {
+    const key = BattleScene.BGM_COMBAT_KEY;
+    const marker = BattleScene.BGM_COMBAT_MARKER;
+    let music = this.sound.get(key);
+    if (!music) {
+      music = this.sound.add(key);
+    }
+    if (!music.markers[marker]) {
+      music.addMarker({
+        name: marker,
+        start: BattleScene.BGM_COMBAT_INTRO_SKIP_SEC,
+        config: { loop: true, volume: BattleScene.BGM_COMBAT_VOLUME }
+      });
+    }
+    const start = (): void => {
+      if (music.isPlaying) {
+        return;
+      }
+      music.play(marker);
+    };
+    if (!this.sound.locked) {
+      start();
+    } else {
+      this.sound.once(Phaser.Sound.Events.UNLOCKED, start);
+    }
+  }
+
+  private stopCombatMusic(): void {
+    this.sound.stopByKey(BattleScene.BGM_COMBAT_KEY);
   }
 
   private buildFloor(): void {
