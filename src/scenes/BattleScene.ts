@@ -9,6 +9,7 @@ import {
 import { SaveService } from "../core/SaveService";
 import type { Role, RunState } from "../core/types";
 import { ALL_ROLES } from "../core/types";
+import { getTypographyScale, loadTypographyMode } from "../core/AccessibilitySettings";
 import { Enemy, type EnemyKind } from "../entities/Enemy";
 import { Player } from "../entities/Player";
 import { SummonAlly, type SummonType } from "../entities/SummonAlly";
@@ -59,7 +60,11 @@ export class BattleScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor("#12172e");
-    this.hud = new HUD(this, () => this.abandonRun());
+    this.hud = new HUD(
+      this,
+      () => this.abandonRun(),
+      () => this.renderCurrentWaveVisuals()
+    );
     this.buildFloor();
     this.startBattle();
     this.scale.on("resize", () => {
@@ -144,9 +149,9 @@ export class BattleScene extends Phaser.Scene {
     this.visuals.forEach((node) => {
       if (node.body.y > battleHeight - 25) {
         node.body.y = battleHeight - 25;
-        node.icon.y = node.body.y - 6;
-        node.name.y = node.body.y + 44;
-        node.hp.y = node.body.y - 56;
+        node.icon.y = node.body.y - 8;
+        node.name.y = node.body.y + 66;
+        node.hp.y = node.body.y - 84;
         node.targetZone.y = node.body.y;
       }
       if (node.body.x < 40) {
@@ -175,11 +180,12 @@ export class BattleScene extends Phaser.Scene {
     emoji: string,
     visualScale = 1
   ): void {
+    const typographyScale = this.getTypographyScale();
     const bodyWidth = Math.round(92 * visualScale);
     const bodyHeight = Math.round(112 * visualScale);
-    const iconSize = Math.max(30, Math.round(52 * visualScale));
-    const nameSize = Math.max(14, Math.round(18 * visualScale));
-    const hpSize = Math.max(13, Math.round(16 * visualScale));
+    const iconSize = Math.max(24, Math.round(44 * visualScale * typographyScale));
+    const nameSize = Math.max(10, Math.round(12 * visualScale * typographyScale));
+    const hpSize = Math.max(10, Math.round(12 * visualScale * typographyScale));
     const targetWidth = Math.round(80 * visualScale);
     const targetHeight = Math.round(100 * visualScale);
 
@@ -188,7 +194,7 @@ export class BattleScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x89b4ff)
       .setDepth(30);
     const icon = this.add
-      .text(x, y - 6 * visualScale, emoji, { fontSize: `${iconSize}px` })
+      .text(x, y - 8 * visualScale, emoji, { fontSize: `${iconSize}px` })
       .setOrigin(0.5)
       .setDepth(31);
     const name = this.add
@@ -587,8 +593,7 @@ export class BattleScene extends Phaser.Scene {
       enemy.shouldTriggerDemonSummon() &&
       this.enemies.length < this.maxEnemiesOnField
     ) {
-      const helperKind: EnemyKind = Math.random() > 0.5 ? "slime_blob" : "skeleton_minion";
-      const helper = this.createSummonEnemy(helperKind, enemy);
+      const helper = this.createDemonRoomSupportEnemy();
       this.enemies.push(helper);
       this.renderCurrentWaveVisuals();
       this.afterAction([`${enemy.name} invoca apoyo: ${helper.name}.`], 1450, enemy, []);
@@ -693,13 +698,12 @@ export class BattleScene extends Phaser.Scene {
     if (this.enemies.length >= this.maxEnemiesOnField) {
       return false;
     }
-    return Math.random() < 0.35;
+    return Math.random() < 0.7;
   }
 
   private summonSkeletonMinions(): string[] {
-    const maxByFloor = this.runState.floor >= 12 ? 3 : this.runState.floor >= 5 ? 2 : 1;
     const availableSlots = Math.max(0, this.maxEnemiesOnField - this.enemies.length);
-    const amount = Math.min(availableSlots, 1 + Math.floor(Math.random() * maxByFloor));
+    const amount = Math.min(availableSlots, 1 + Math.floor(Math.random() * 3));
     if (amount <= 0) {
       return ["El Mago Esqueleto intenta invocar, pero no hay espacio."];
     }
@@ -719,7 +723,7 @@ export class BattleScene extends Phaser.Scene {
       const hpBase = source
         ? Math.max(1, Math.round(source.stats.hp * 0.15))
         : Math.round(base.maxHp * 0.2 * difficultyMultiplier);
-      const attack = source?.baseAttackSnapshot ?? Math.round(base.attack * 0.7 * difficultyMultiplier);
+      const attack = source?.stats.attack ?? Math.round(base.attack * 0.7 * difficultyMultiplier);
       return new Enemy(
         `enemy-summon-${this.enemyCounter++}`,
         "Bola de Slime",
@@ -749,6 +753,47 @@ export class BattleScene extends Phaser.Scene {
         healPower: 0
       },
       "skeleton_minion",
+      false
+    );
+  }
+
+  private createDemonRoomSupportEnemy(): Enemy {
+    const base = getEnemyStatsByFloor(this.runState.floor);
+    const difficultyMultiplier = this.getRosterDifficultyMultiplier();
+    const supportPower = 1.35;
+    const roll = Math.random();
+
+    if (roll < 0.5) {
+      return new Enemy(
+        `enemy-summon-${this.enemyCounter++}`,
+        "Slime Alfa",
+        {
+          maxHp: Math.round(base.maxHp * 0.95 * difficultyMultiplier * supportPower),
+          hp: Math.round(base.maxHp * 0.95 * difficultyMultiplier * supportPower),
+          attack: Math.round(base.attack * 0.9 * difficultyMultiplier * supportPower),
+          magic: 0,
+          defense: Math.round(base.defense * 0.85 * difficultyMultiplier * supportPower),
+          speed: Math.round(base.speed * 1.05),
+          healPower: 0
+        },
+        "slime",
+        false
+      );
+    }
+
+    return new Enemy(
+      `enemy-summon-${this.enemyCounter++}`,
+      "Mago Esqueleto Elite",
+      {
+        maxHp: Math.round(base.maxHp * 1.05 * difficultyMultiplier * supportPower),
+        hp: Math.round(base.maxHp * 1.05 * difficultyMultiplier * supportPower),
+        attack: Math.round(base.attack * 0.95 * difficultyMultiplier * supportPower),
+        magic: Math.round(base.magic * 1.1 * difficultyMultiplier * supportPower),
+        defense: Math.round(base.defense * 0.9 * difficultyMultiplier * supportPower),
+        speed: Math.round(base.speed * 1.02),
+        healPower: 0
+      },
+      "skeleton_mage",
       false
     );
   }
@@ -994,7 +1039,7 @@ export class BattleScene extends Phaser.Scene {
       });
       const marker = this.add
         .text(node.body.x, node.body.y - 84, target.team === "enemy" ? "⚔️" : "✨", {
-          fontSize: "30px"
+          fontSize: `${Math.round(24 * this.getTypographyScale())}px`
         })
         .setOrigin(0.5)
         .setDepth(80);
@@ -1048,6 +1093,10 @@ export class BattleScene extends Phaser.Scene {
     const height = this.scale.height;
     const battleHeight = Math.max(250, Math.floor(height * 0.7));
     return { width, height, battleHeight, isCompact: width < 760 };
+  }
+
+  private getTypographyScale(): number {
+    return getTypographyScale(loadTypographyMode());
   }
 
   private getEmoji(character: Character): string {
