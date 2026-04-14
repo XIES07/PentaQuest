@@ -84,6 +84,7 @@ export class BattleScene extends Phaser.Scene {
       () => this.abandonRun(),
       () => this.renderCurrentWaveVisuals()
     );
+    this.hud.setPartySelectHandler((targetId) => this.onPartyTargetClick(targetId));
     this.buildFloor();
     this.startBattle();
     this.scale.on("resize", () => {
@@ -167,21 +168,6 @@ export class BattleScene extends Phaser.Scene {
     });
     this.visuals.clear();
 
-    const playerLayout = this.getPlayerLayout(this.players);
-    this.players.forEach((player, index) => {
-      const slot = playerLayout[index];
-      if (!slot) {
-        return;
-      }
-      this.createVisual(
-        player,
-        slot.x,
-        slot.y,
-        slot.color,
-        this.getEmoji(player),
-        slot.scale
-      );
-    });
     const enemyLayout = this.getEnemyLayout(this.enemies.length);
     this.enemies.forEach((enemy, index) => {
       const color = enemy.isMainWaveEnemy ? 0x4a1f2f : 0x352544;
@@ -300,9 +286,9 @@ export class BattleScene extends Phaser.Scene {
     const bottomCount = count - topCount;
     const maxRowCount = Math.max(topCount, bottomCount, 1);
 
-    // Encoge enemigos cuando la sala se llena para mantener clic y legibilidad.
-    const scale = (count <= 3 ? 0.95 : count <= 5 ? 0.8 : count <= 7 ? 0.68 : 0.58) * (isCompact ? 0.86 : 1);
-    const maxWidth = Math.max(260, width - 90);
+    // Ocupa todo el campo: enemigos grandes al inicio, luego se reducen por densidad.
+    const scale = (count <= 2 ? 1.14 : count <= 4 ? 0.98 : count <= 6 ? 0.84 : 0.68) * (isCompact ? 0.84 : 1);
+    const maxWidth = Math.max(320, width - 60);
     const spacing =
       maxRowCount <= 1
         ? 0
@@ -320,50 +306,11 @@ export class BattleScene extends Phaser.Scene {
       }));
     };
 
-    const topRowY = Math.max(86, Math.floor(battleHeight * 0.21));
-    const bottomRowY = Math.max(topRowY + 78, Math.floor(battleHeight * 0.45));
-    const topRow = buildRow(topCount, topRowY).map((slot) => ({ ...slot, x: slot.x + width * 0.16 }));
-    const bottomRow = buildRow(bottomCount, bottomRowY).map((slot) => ({ ...slot, x: slot.x + width * 0.16 }));
+    const topRowY = Math.max(74, Math.floor(battleHeight * 0.24));
+    const bottomRowY = Math.max(topRowY + 88, Math.floor(battleHeight * 0.6));
+    const topRow = buildRow(topCount, topRowY);
+    const bottomRow = buildRow(bottomCount, bottomRowY);
     return [...topRow, ...bottomRow];
-  }
-
-  private getPlayerLayout(
-    units: Character[]
-  ): Array<{ x: number; y: number; scale: number; color: number }> {
-    if (units.length === 0) {
-      return [];
-    }
-    const { width, battleHeight, isCompact } = this.getViewport();
-    const heroes = units.filter((unit) => unit instanceof Player);
-    const summons = units.filter((unit) => unit instanceof SummonAlly);
-    const heroSpacing =
-      heroes.length <= 1
-        ? 0
-        : Math.max(72, Math.min(145, Math.floor((width - 120) / Math.max(1, heroes.length - 1))));
-    const heroStartX = heroes.length <= 1 ? width * 0.5 : Math.max(60, width * 0.18);
-    const heroSlots = heroes.map((hero, index) => ({
-      id: hero.id,
-      x: heroStartX + index * heroSpacing,
-      y: Math.floor(battleHeight * 0.86),
-      scale: isCompact ? 0.9 : 1,
-      color: 0x1a2e4a
-    }));
-
-    const summonSpacing = summons.length <= 1 ? 0 : Math.max(68, Math.min(115, Math.floor((width - 180) / summons.length)));
-    const summonStartX = width * 0.5 - ((summons.length - 1) * summonSpacing) / 2;
-    const summonSlots = summons.map((summon, index) => ({
-      id: summon.id,
-      x: summonStartX + index * summonSpacing,
-      y: Math.floor(battleHeight * 0.66),
-      scale: isCompact ? 0.68 : 0.78,
-      color: 0x1d3540
-    }));
-
-    const map = new Map<string, { x: number; y: number; scale: number; color: number }>();
-    [...heroSlots, ...summonSlots].forEach((slot) => map.set(slot.id, slot));
-    return units
-      .map((unit) => map.get(unit.id))
-      .filter((slot): slot is { x: number; y: number; scale: number; color: number } => slot !== undefined);
   }
 
   private paintCharacterState(character: Character): void {
@@ -423,6 +370,7 @@ export class BattleScene extends Phaser.Scene {
     }
     this.hud.setQueue(`Siguiente: ${this.turnQueue.map((u) => u.name).join(" > ")}`);
     this.hud.renderTeamInfo(this.actorInTurn);
+    this.hud.renderParty(this.players);
 
     if (this.actorInTurn.team === "enemy") {
       this.phase = "enemy_action";
@@ -544,6 +492,20 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     if (this.selectedSkill.targetType === "single_ally" && target.team !== "player") {
+      return;
+    }
+    this.resolvePlayerAction([target]);
+  }
+
+  private onPartyTargetClick(targetId: string): void {
+    if (this.phase !== "player_select_target" || !this.selectedSkill || !this.actorInTurn) {
+      return;
+    }
+    if (this.selectedSkill.targetType !== "single_ally") {
+      return;
+    }
+    const target = this.players.find((unit) => unit.id === targetId);
+    if (!target || !target.isAlive) {
       return;
     }
     this.resolvePlayerAction([target]);
@@ -756,6 +718,10 @@ export class BattleScene extends Phaser.Scene {
     [...this.players, ...this.enemies].forEach((unit) => this.paintCharacterState(unit));
     const message = logs.length > 0 ? logs.join(" ") : "Accion completada.";
     this.hud.setLog(message);
+    this.hud.renderParty(this.players);
+    targets
+      .filter((target) => target.team === "player")
+      .forEach((target) => this.hud.pulsePartyMember(target.id));
     this.hud.pushHistory(message);
     this.runState.logHistory.push(message);
     this.saveService.save(this.runState);
@@ -778,12 +744,10 @@ export class BattleScene extends Phaser.Scene {
 
   private pruneDefeatedUnitsFromField(): boolean {
     const aliveIds = new Set(this.enemies.filter((enemy) => enemy.isAlive).map((enemy) => enemy.id));
-    const alivePlayerIds = new Set(this.players.filter((player) => player.isAlive).map((player) => player.id));
     let removedAny = false;
     this.visuals.forEach((node, id) => {
       const isEnemyVisual = this.enemies.some((enemy) => enemy.id === id);
-      const isSummonVisual = this.players.some((player) => player.id === id && player instanceof SummonAlly);
-      if ((isEnemyVisual && !aliveIds.has(id)) || (isSummonVisual && !alivePlayerIds.has(id))) {
+      if (isEnemyVisual && !aliveIds.has(id)) {
         node.body.destroy();
         node.icon.destroy();
         node.name.destroy();
@@ -1194,38 +1158,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawArenaByCurrentWave(): void {
-    const { width, battleHeight } = this.getViewport();
     this.arenaObjects.forEach((obj) => obj.destroy());
     this.arenaObjects = [];
-    const mainEnemy = this.enemyWave[this.enemyWaveIndex];
-    const kind = mainEnemy?.kind ?? "slime";
-    const centerX = width / 2;
-    const arenaMidY = Math.floor(battleHeight * 0.45);
-
-    if (kind === "slime") {
-      const grass = this.add.rectangle(centerX, arenaMidY - 40, width, battleHeight, 0x315a2b, 1).setDepth(-20);
-      const dirt = this.add.rectangle(centerX, arenaMidY + 30, width, Math.floor(battleHeight * 0.6), 0x4d6b33, 0.9).setDepth(-19);
-      const trees = [0.11, 0.27, 0.78, 0.92].map((xRatio) =>
-        this.add.circle(Math.floor(width * xRatio), Math.floor(battleHeight * 0.22), 24, 0x1e3f1c, 1).setDepth(-18)
-      );
-      this.arenaObjects.push(grass, dirt, ...trees);
-      return;
-    }
-    if (kind === "skeleton_mage") {
-      const field = this.add.rectangle(centerX, arenaMidY - 40, width, battleHeight, 0x11213d, 1).setDepth(-20);
-      const moonShade = this.add.rectangle(centerX, arenaMidY + 30, width, Math.floor(battleHeight * 0.6), 0x1b2f50, 0.92).setDepth(-19);
-      const rocks = [0.16, 0.41, 0.73, 0.9].map((xRatio) =>
-        this.add.rectangle(Math.floor(width * xRatio), Math.floor(battleHeight * 0.26), 46, 30, 0x30476e, 0.9).setDepth(-18)
-      );
-      this.arenaObjects.push(field, moonShade, ...rocks);
-      return;
-    }
-    const dungeon = this.add.rectangle(centerX, arenaMidY - 40, width, battleHeight, 0x3a1010, 1).setDepth(-20);
-    const tiles = this.add.rectangle(centerX, arenaMidY + 30, width, Math.floor(battleHeight * 0.6), 0x5b1a1a, 0.92).setDepth(-19);
-    const torches = [0.12, 0.3, 0.69, 0.88].map((xRatio) =>
-      this.add.circle(Math.floor(width * xRatio), Math.floor(battleHeight * 0.24), 14, 0xff6a00, 0.9).setDepth(-18)
-    );
-    this.arenaObjects.push(dungeon, tiles, ...torches);
+    // Escenario decorativo desactivado: se prioriza espacio y limpieza visual.
   }
 
   private getViewport(): { width: number; height: number; battleHeight: number; isCompact: boolean } {
@@ -1239,8 +1174,8 @@ export class BattleScene extends Phaser.Scene {
   private getUiPanelHeightEstimate(screenHeight: number): number {
     const textScale = this.getTypographyScale();
     return Math.max(
-      Math.round(150 + 70 * textScale),
-      Math.floor(screenHeight * (0.28 + 0.05 * (textScale - 1)))
+      Math.round(230 + 80 * textScale),
+      Math.floor(screenHeight * (0.42 + 0.08 * (textScale - 1)))
     );
   }
 

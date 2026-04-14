@@ -14,8 +14,8 @@ export class HUD {
   private readonly onTypographyChanged: () => void;
   private textMode: TypographyMode = loadTypographyMode();
   private textScale = getTypographyScale(this.textMode);
-  private readonly topPanel: Phaser.GameObjects.Rectangle;
   private readonly bottomPanel: Phaser.GameObjects.Rectangle;
+  private readonly partyPanel: Phaser.GameObjects.Rectangle;
   private readonly actionPanel: Phaser.GameObjects.Rectangle;
   private readonly turnLabel: Phaser.GameObjects.Text;
   private readonly logLabel: Phaser.GameObjects.Text;
@@ -39,15 +39,19 @@ export class HUD {
   private confirmVisible = false;
   private readonly recentLogs: string[] = [];
   private readonly skillButtons: Phaser.GameObjects.GameObject[] = [];
+  private readonly partyWidgets: Phaser.GameObjects.GameObject[] = [];
+  private readonly partyCardById = new Map<string, Phaser.GameObjects.Rectangle>();
+  private partySelectHandler: ((targetId: string) => void) | null = null;
   private activeSkills: ISkill[] = [];
+  private activeParty: Character[] = [];
   private activeSkillClick: ((skill: ISkill) => void) | null = null;
 
   constructor(scene: Phaser.Scene, onAbandon: () => void, onTypographyChanged: () => void) {
     this.scene = scene;
     this.onAbandon = onAbandon;
     this.onTypographyChanged = onTypographyChanged;
-    this.topPanel = scene.add.rectangle(0, 0, 10, 10, 0x050d24, 0.86).setDepth(994).setOrigin(0);
     this.bottomPanel = scene.add.rectangle(0, 0, 10, 10, 0x081232, 0.96).setDepth(995).setOrigin(0);
+    this.partyPanel = scene.add.rectangle(0, 0, 10, 10, 0x0e1b40, 0.98).setDepth(996).setOrigin(0);
     this.actionPanel = scene.add.rectangle(0, 0, 10, 10, 0x111d44, 0.98).setDepth(997).setOrigin(0);
     this.turnLabel = scene.add
       .text(16, 470, "", { fontSize: "18px", color: "#ffffff", wordWrap: { width: 920 } })
@@ -218,6 +222,113 @@ export class HUD {
     this.skillButtons.length = 0;
   }
 
+  private clearPartyWidgets(): void {
+    this.partyWidgets.forEach((widget) => widget.destroy());
+    this.partyWidgets.length = 0;
+    this.partyCardById.clear();
+  }
+
+  setPartySelectHandler(handler: ((targetId: string) => void) | null): void {
+    this.partySelectHandler = handler;
+  }
+
+  renderParty(characters: Character[]): void {
+    this.activeParty = [...characters];
+    this.clearPartyWidgets();
+    const partyUnits = characters.filter((unit) => unit.team === "player");
+    if (partyUnits.length === 0) {
+      return;
+    }
+    const sortedUnits = [...partyUnits].sort((a, b) => {
+      const aSummon = a.id.startsWith("summon-");
+      const bSummon = b.id.startsWith("summon-");
+      if (aSummon === bSummon) return 0;
+      return aSummon ? 1 : -1;
+    });
+    const metrics = this.getLayoutMetrics();
+    const contentWidth = metrics.width - 24;
+    const cardWidth = Math.max(106, Math.min(172, Math.floor(contentWidth / sortedUnits.length) - 8));
+    const cardHeight = metrics.partyRowHeight - 12;
+    const totalWidth = sortedUnits.length * cardWidth + (sortedUnits.length - 1) * 8;
+    const startX = (metrics.width - totalWidth) / 2 + cardWidth / 2;
+    const centerY = metrics.panelTop + metrics.controlsHeight + metrics.partyRowHeight / 2;
+
+    sortedUnits.forEach((hero, index) => {
+      const x = startX + index * (cardWidth + 8);
+      const card = this.scene.add
+        .rectangle(x, centerY, cardWidth, cardHeight, 0x1c315e, 0.98)
+        .setStrokeStyle(2, 0x8cc8ff)
+        .setDepth(1001);
+      if (hero.isAlive) {
+        card.setInteractive({ useHandCursor: true });
+        card.on("pointerdown", () => this.partySelectHandler?.(hero.id));
+      } else {
+        card.setAlpha(0.52);
+      }
+      this.partyWidgets.push(card);
+      this.partyCardById.set(hero.id, card);
+
+      const textureKey = this.getPortraitTextureKey(hero);
+      if (textureKey && this.scene.textures.exists(textureKey)) {
+        const icon = this.scene.add
+          .image(x - cardWidth * 0.32, centerY - 2, textureKey)
+          .setDisplaySize(cardHeight * 0.7, cardHeight * 0.7)
+          .setDepth(1002);
+        if (!hero.isAlive) {
+          icon.setAlpha(0.45);
+        }
+        this.partyWidgets.push(icon);
+      }
+
+      const name = this.scene.add
+        .text(x - cardWidth * 0.08, centerY - cardHeight * 0.24, hero.name, {
+          fontSize: `${Math.max(11, Math.round((metrics.isCompact ? 11 : 12) * this.textScale))}px`,
+          color: "#ffffff"
+        })
+        .setDepth(1002);
+      const hpColor = hero.stats.hp / hero.stats.maxHp > 0.35 ? "#9df2b5" : "#ff9a9a";
+      const hp = this.scene.add
+        .text(x - cardWidth * 0.08, centerY + cardHeight * 0.02, `HP ${hero.stats.hp}/${hero.stats.maxHp}`, {
+          fontSize: `${Math.max(10, Math.round((metrics.isCompact ? 10 : 11) * this.textScale))}px`,
+          color: hpColor
+        })
+        .setDepth(1002);
+      if (!hero.isAlive) {
+        name.setColor("#9aa3bf");
+        hp.setColor("#7d869f");
+      }
+      this.partyWidgets.push(name, hp);
+    });
+  }
+
+  pulsePartyMember(targetId: string): void {
+    const card = this.partyCardById.get(targetId);
+    if (!card) {
+      return;
+    }
+    const flash = this.scene.add
+      .rectangle(card.x, card.y, card.width, card.height, 0xff5f5f, 0.28)
+      .setDepth(1010);
+    this.partyWidgets.push(flash);
+    this.scene.tweens.add({
+      targets: [card],
+      scaleX: 1.06,
+      scaleY: 1.06,
+      duration: 90,
+      yoyo: true
+    });
+    this.scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 260,
+      onComplete: () => {
+        flash.destroy();
+        const idx = this.partyWidgets.indexOf(flash);
+        if (idx >= 0) this.partyWidgets.splice(idx, 1);
+      }
+    });
+  }
+
   renderSkills(skills: ISkill[], onClick: (skill: ISkill) => void): void {
     this.activeSkills = skills;
     this.activeSkillClick = onClick;
@@ -274,28 +385,30 @@ export class HUD {
 
   layout(): void {
     const metrics = this.getLayoutMetrics();
-
-    this.topPanel.setPosition(0, 0).setSize(metrics.width, metrics.topBarHeight);
     this.bottomPanel.setPosition(0, metrics.panelTop).setSize(metrics.width, metrics.bottomPanelHeight);
+    this.partyPanel
+      .setPosition(0, metrics.panelTop + metrics.controlsHeight)
+      .setSize(metrics.width, metrics.partyRowHeight);
     this.actionPanel
       .setPosition(0, metrics.actionTop)
-      .setSize(metrics.width, Math.max(48, metrics.bottomPanelHeight - metrics.infoHeight));
+      .setSize(metrics.width, Math.max(48, metrics.bottomPanelHeight - (metrics.actionTop - metrics.panelTop)));
     this.turnLabel
-      .setPosition(12, metrics.panelTop + metrics.queueSize + 16)
+      .setPosition(12, metrics.panelTop + metrics.controlsHeight + metrics.partyRowHeight + 6)
       .setFontSize(metrics.turnSize)
       .setWordWrapWidth(metrics.width - 24);
     this.logLabel
-      .setPosition(12, metrics.panelTop + metrics.queueSize + metrics.turnSize + 22)
+      .setPosition(12, metrics.panelTop + metrics.controlsHeight + metrics.partyRowHeight + metrics.turnSize + 12)
       .setFontSize(metrics.logSize)
       .setWordWrapWidth(metrics.width - 24);
     this.queueLabel
       .setPosition(12, metrics.panelTop + 8)
       .setFontSize(metrics.queueSize)
-      .setWordWrapWidth(metrics.width - 24);
+      .setWordWrapWidth(Math.max(140, metrics.width - 720));
 
-    this.historyButton.setPosition(metrics.width - 250, 10).setFontSize(metrics.queueSize);
-    this.abandonButton.setPosition(metrics.width - 560, 10).setFontSize(metrics.queueSize);
-    this.settingsButton.setPosition(metrics.width - 700, 10).setFontSize(metrics.queueSize);
+    const controlsY = metrics.panelTop + 8;
+    this.historyButton.setPosition(metrics.width - 220, controlsY).setFontSize(metrics.queueSize);
+    this.abandonButton.setPosition(metrics.width - 490, controlsY).setFontSize(metrics.queueSize);
+    this.settingsButton.setPosition(metrics.width - 620, controlsY).setFontSize(metrics.queueSize);
     this.historyPanelBg.setPosition(metrics.width * 0.5, Math.max(140, metrics.height * 0.28));
     this.historyPanelBg.setSize(Math.min(metrics.width * 0.9, 500), Math.min(metrics.height * 0.42, 330));
     this.historyPanelText
@@ -330,15 +443,23 @@ export class HUD {
     this.confirmNo
       .setPosition(metrics.width / 2 + 120, this.confirmBg.y + 64)
       .setFontSize((metrics.isCompact ? 18 : 20) * this.textScale);
+
+    if (this.activeParty.length > 0) {
+      this.renderParty(this.activeParty);
+    }
+    if (this.activeSkillClick) {
+      this.renderSkills(this.activeSkills, this.activeSkillClick);
+    }
   }
 
   private getLayoutMetrics(): {
     width: number;
     height: number;
     isCompact: boolean;
-    topBarHeight: number;
     bottomPanelHeight: number;
     panelTop: number;
+    controlsHeight: number;
+    partyRowHeight: number;
     infoHeight: number;
     actionTop: number;
     queueSize: number;
@@ -348,14 +469,15 @@ export class HUD {
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
     const isCompact = width < 760;
-    const topBarHeight = Math.round(44 + 8 * this.textScale);
     const bottomPanelHeight = Math.max(
-      Math.round(150 + 70 * this.textScale),
-      Math.floor(height * (0.28 + 0.05 * (this.textScale - 1)))
+      Math.round(230 + 80 * this.textScale),
+      Math.floor(height * (0.42 + 0.08 * (this.textScale - 1)))
     );
     const panelTop = height - bottomPanelHeight;
-    const infoHeight = Math.max(Math.round(58 + 26 * this.textScale), isCompact ? 92 : 106);
-    const actionTop = panelTop + infoHeight;
+    const controlsHeight = Math.max(52, Math.round(34 + 12 * this.textScale));
+    const partyRowHeight = Math.max(96, Math.round(76 + 20 * this.textScale));
+    const infoHeight = Math.max(Math.round(76 + 26 * this.textScale), isCompact ? 104 : 120);
+    const actionTop = panelTop + controlsHeight + partyRowHeight + infoHeight;
     const queueSize = (isCompact ? 13 : 16) * this.textScale;
     const turnSize = (isCompact ? 16 : 20) * this.textScale;
     const logSize = (isCompact ? 14 : 18) * this.textScale;
@@ -363,9 +485,10 @@ export class HUD {
       width,
       height,
       isCompact,
-      topBarHeight,
       bottomPanelHeight,
       panelTop,
+      controlsHeight,
+      partyRowHeight,
       infoHeight,
       actionTop,
       queueSize,
@@ -385,6 +508,20 @@ export class HUD {
     this.confirmNo.setVisible(visible);
   }
 
+  private getPortraitTextureKey(character: Character): string | null {
+    if (character.id.startsWith("summon-")) {
+      if (character.name.toLowerCase().includes("serpiente")) return "summon_snake";
+      if (character.name.toLowerCase().includes("oso")) return "summon_bear";
+      return "summon_deer";
+    }
+    if (character.id.includes("swordsman")) return "player_swordsman";
+    if (character.id.includes("tank")) return "player_tank";
+    if (character.id.includes("mage")) return "player_mage";
+    if (character.id.includes("healer")) return "player_healer";
+    if (character.id.includes("ranger")) return "player_ranger";
+    return null;
+  }
+
   private toggleSettings(visible: boolean): void {
     this.settingsVisible = visible;
     this.settingsPanelBg.setVisible(visible);
@@ -399,9 +536,6 @@ export class HUD {
     this.textScale = getTypographyScale(mode);
     saveTypographyMode(mode);
     this.layout();
-    if (this.activeSkillClick) {
-      this.renderSkills(this.activeSkills, this.activeSkillClick);
-    }
     this.onTypographyChanged();
     this.toggleSettings(false);
   }
