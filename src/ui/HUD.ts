@@ -41,6 +41,7 @@ export class HUD {
   private readonly skillButtons: Phaser.GameObjects.GameObject[] = [];
   private readonly partyWidgets: Phaser.GameObjects.GameObject[] = [];
   private readonly partyCardById = new Map<string, Phaser.GameObjects.Rectangle>();
+  private readonly partyObjectsById = new Map<string, Phaser.GameObjects.GameObject[]>();
   private partySelectHandler: ((targetId: string) => void) | null = null;
   private activeSkills: ISkill[] = [];
   private activeParty: Character[] = [];
@@ -228,6 +229,7 @@ export class HUD {
     this.partyWidgets.forEach((widget) => widget.destroy());
     this.partyWidgets.length = 0;
     this.partyCardById.clear();
+    this.partyObjectsById.clear();
   }
 
   setPartySelectHandler(handler: ((targetId: string) => void) | null): void {
@@ -249,7 +251,7 @@ export class HUD {
     });
     const metrics = this.getLayoutMetrics();
     const contentWidth = metrics.width - 24;
-    const cardWidth = Math.max(106, Math.min(172, Math.floor(contentWidth / sortedUnits.length) - 8));
+    const cardWidth = Math.max(92, Math.min(156, Math.floor(contentWidth / sortedUnits.length) - 8));
     const cardHeight = metrics.partyRowHeight - 12;
     const totalWidth = sortedUnits.length * cardWidth + (sortedUnits.length - 1) * 8;
     const startX = (metrics.width - totalWidth) / 2 + cardWidth / 2;
@@ -257,6 +259,7 @@ export class HUD {
 
     sortedUnits.forEach((hero, index) => {
       const x = startX + index * (cardWidth + 8);
+      const widgetsByUnit: Phaser.GameObjects.GameObject[] = [];
       const card = this.scene.add
         .rectangle(x, centerY, cardWidth, cardHeight, 0x3a3e46, 0.98)
         .setStrokeStyle(2, 0xb6bbc4)
@@ -269,6 +272,7 @@ export class HUD {
       }
       this.partyWidgets.push(card);
       this.partyCardById.set(hero.id, card);
+      widgetsByUnit.push(card);
 
       const textureKey = this.getPortraitTextureKey(hero);
       if (textureKey && this.scene.textures.exists(textureKey)) {
@@ -280,6 +284,7 @@ export class HUD {
           .setStrokeStyle(2, 0xc4c9d2)
           .setDepth(1002);
         this.partyWidgets.push(ring);
+        widgetsByUnit.push(ring);
         const icon = this.scene.add
           .image(iconX, iconY, textureKey)
           .setDisplaySize(portraitRadius * 2, portraitRadius * 2)
@@ -289,22 +294,24 @@ export class HUD {
         iconMask.fillCircle(iconX, iconY, portraitRadius);
         icon.setMask(iconMask.createGeometryMask());
         this.partyWidgets.push(iconMask);
+        widgetsByUnit.push(iconMask);
         if (!hero.isAlive) {
           icon.setAlpha(0.45);
         }
         this.partyWidgets.push(icon);
+        widgetsByUnit.push(icon);
       }
 
       const name = this.scene.add
         .text(x - cardWidth * 0.08, centerY - cardHeight * 0.24, hero.name, {
-          fontSize: `${Math.max(11, Math.round((metrics.isCompact ? 11 : 12) * this.textScale))}px`,
+          fontSize: `${Math.max(10, Math.round((metrics.isCompact ? 10 : 11) * metrics.layoutScale))}px`,
           color: "#ffffff"
         })
         .setDepth(1002);
       const hpColor = hero.stats.hp / hero.stats.maxHp > 0.35 ? "#9df2b5" : "#ff9a9a";
       const hp = this.scene.add
         .text(x - cardWidth * 0.08, centerY + cardHeight * 0.02, `HP ${hero.stats.hp}/${hero.stats.maxHp}`, {
-          fontSize: `${Math.max(10, Math.round((metrics.isCompact ? 10 : 11) * this.textScale))}px`,
+          fontSize: `${Math.max(9, Math.round((metrics.isCompact ? 9 : 10) * metrics.layoutScale))}px`,
           color: hpColor
         })
         .setDepth(1002);
@@ -313,6 +320,8 @@ export class HUD {
         hp.setColor("#7d869f");
       }
       this.partyWidgets.push(name, hp);
+      widgetsByUnit.push(name, hp);
+      this.partyObjectsById.set(hero.id, widgetsByUnit);
     });
   }
 
@@ -344,18 +353,50 @@ export class HUD {
     });
   }
 
+  getPartyCardCenter(targetId: string): { x: number; y: number } | null {
+    const card = this.partyCardById.get(targetId);
+    if (!card) {
+      return null;
+    }
+    return { x: card.x, y: card.y };
+  }
+
+  animatePartyMemberTowards(sourceId: string, destination: { x: number; y: number }): void {
+    const card = this.partyCardById.get(sourceId);
+    const objects = this.partyObjectsById.get(sourceId);
+    if (!card || !objects || objects.length === 0) {
+      return;
+    }
+    const dx = destination.x - card.x;
+    const dy = destination.y - card.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const step = Math.min(52, dist * 0.22);
+    const moveX = (dx / dist) * step;
+    const moveY = (dy / dist) * step;
+    this.scene.tweens.add({
+      targets: objects,
+      x: `+=${moveX}`,
+      y: `+=${moveY}`,
+      duration: 160,
+      yoyo: true,
+      ease: "Quad.easeOut"
+    });
+  }
+
   renderSkills(skills: ISkill[], onClick: (skill: ISkill) => void): void {
     this.activeSkills = skills;
     this.activeSkillClick = onClick;
     this.clearSkillButtons();
     const metrics = this.getLayoutMetrics();
     const { width, isCompact } = metrics;
-    const buttonWidth = isCompact ? 176 * this.textScale : 220 * this.textScale;
-    const buttonHeight = isCompact ? 40 * this.textScale : 46 * this.textScale;
+    const buttonScale = Math.min(metrics.layoutScale, 1.18);
+    const buttonHeight = Math.round((isCompact ? 44 : 48) * buttonScale);
     const marginX = isCompact ? 12 : 16;
     const gapX = isCompact ? 8 : 10;
     const gapY = isCompact ? 8 : 10;
-    const buttonsPerRow = Math.max(2, Math.floor((width - marginX * 2 + gapX) / (buttonWidth + gapX)));
+    const buttonsPerRow = isCompact ? 2 : Math.max(2, Math.min(3, skills.length));
+    const usableWidth = width - marginX * 2 - gapX * (buttonsPerRow - 1);
+    const buttonWidth = Math.max(120, Math.floor(usableWidth / buttonsPerRow));
     skills.forEach((skill, index) => {
       const row = Math.floor(index / buttonsPerRow);
       const col = index % buttonsPerRow;
@@ -368,7 +409,7 @@ export class HUD {
         .setInteractive({ useHandCursor: true });
       const text = this.scene.add
         .text(x + 8, y + 8, `[${index + 1}] ${skill.nameEs}`, {
-          fontSize: `${(isCompact ? 16 : 19) * this.textScale}px`,
+          fontSize: `${Math.round((isCompact ? 14 : 16) * buttonScale)}px`,
           color: "#f4f5f7",
           wordWrap: { width: buttonWidth - 16 }
         })
@@ -382,10 +423,10 @@ export class HUD {
     if (skills.length === 0) {
       const placeholder = this.scene.add
         .text(marginX, metrics.actionTop + 12, "Esperando turno...", {
-          fontSize: `${(isCompact ? 16 : 19) * this.textScale}px`,
+          fontSize: `${Math.round((isCompact ? 14 : 16) * buttonScale)}px`,
           color: "#e0e3e9",
           backgroundColor: "#434852",
-          padding: { x: 12 * this.textScale, y: 8 * this.textScale }
+          padding: { x: 12 * buttonScale, y: 8 * buttonScale }
         })
         .setDepth(1000);
       this.skillButtons.push(placeholder);
@@ -418,12 +459,32 @@ export class HUD {
     this.queueLabel
       .setPosition(12, metrics.panelTop + 8)
       .setFontSize(metrics.queueSize)
-      .setWordWrapWidth(Math.max(140, metrics.width - 720));
+      .setWordWrapWidth(metrics.width - 24);
 
-    const controlsY = metrics.panelTop + 8;
-    this.historyButton.setPosition(metrics.width - 220, controlsY).setFontSize(metrics.queueSize);
-    this.abandonButton.setPosition(metrics.width - 490, controlsY).setFontSize(metrics.queueSize);
-    this.settingsButton.setPosition(metrics.width - 620, controlsY).setFontSize(metrics.queueSize);
+    const controlsY = metrics.panelTop + metrics.queueSize + 14;
+    const baseControlFont = metrics.isCompact ? Math.max(11, metrics.queueSize - 1) : metrics.queueSize;
+    let controlFont = baseControlFont;
+    this.historyButton.setFontSize(controlFont);
+    this.abandonButton.setFontSize(controlFont);
+    this.settingsButton.setFontSize(controlFont);
+
+    let historyX = metrics.width - 12 - this.historyButton.displayWidth;
+    let abandonX = historyX - 8 - this.abandonButton.displayWidth;
+    let settingsX = abandonX - 8 - this.settingsButton.displayWidth;
+    if (settingsX < 8) {
+      controlFont = Math.max(10, baseControlFont - 2);
+      this.historyButton.setFontSize(controlFont);
+      this.abandonButton.setFontSize(controlFont);
+      this.settingsButton.setFontSize(controlFont);
+      historyX = metrics.width - 12 - this.historyButton.displayWidth;
+      abandonX = historyX - 8 - this.abandonButton.displayWidth;
+      settingsX = abandonX - 8 - this.settingsButton.displayWidth;
+    }
+
+    this.historyButton.setPosition(historyX, controlsY);
+    this.abandonButton.setPosition(abandonX, controlsY);
+    this.settingsButton.setPosition(settingsX, controlsY);
+    this.queueLabel.setWordWrapWidth(Math.max(120, settingsX - 20));
     this.historyPanelBg.setPosition(metrics.width * 0.5, Math.max(140, metrics.height * 0.28));
     this.historyPanelBg.setSize(Math.min(metrics.width * 0.9, 500), Math.min(metrics.height * 0.42, 330));
     this.historyPanelText
@@ -471,6 +532,7 @@ export class HUD {
     width: number;
     height: number;
     isCompact: boolean;
+    layoutScale: number;
     bottomPanelHeight: number;
     panelTop: number;
     controlsHeight: number;
@@ -484,22 +546,24 @@ export class HUD {
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
     const isCompact = width < 760;
+    const layoutScale = isCompact ? Math.min(this.textScale, 1.34) : Math.min(this.textScale, 1.6);
     const bottomPanelHeight = Math.max(
-      Math.round(230 + 80 * this.textScale),
-      Math.floor(height * (0.42 + 0.08 * (this.textScale - 1)))
+      Math.round(240 + 84 * layoutScale),
+      Math.floor(height * (0.44 + 0.06 * (layoutScale - 1)))
     );
     const panelTop = height - bottomPanelHeight;
-    const controlsHeight = Math.max(52, Math.round(34 + 12 * this.textScale));
-    const partyRowHeight = Math.max(96, Math.round(76 + 20 * this.textScale));
-    const infoHeight = Math.max(Math.round(76 + 26 * this.textScale), isCompact ? 104 : 120);
+    const controlsHeight = isCompact ? Math.max(84, Math.round(62 + 10 * layoutScale)) : Math.max(58, Math.round(38 + 10 * layoutScale));
+    const partyRowHeight = Math.max(92, Math.round(74 + 18 * layoutScale));
+    const infoHeight = Math.max(Math.round(72 + 24 * layoutScale), isCompact ? 98 : 112);
     const actionTop = panelTop + controlsHeight + partyRowHeight + infoHeight;
-    const queueSize = Math.min((isCompact ? 12 : 14) * this.textScale, isCompact ? 16 : 20);
-    const turnSize = Math.min((isCompact ? 15 : 18) * this.textScale, isCompact ? 24 : 32);
-    const logSize = Math.min((isCompact ? 13 : 16) * this.textScale, isCompact ? 22 : 28);
+    const queueSize = Math.min((isCompact ? 11 : 13) * layoutScale, isCompact ? 16 : 20);
+    const turnSize = Math.min((isCompact ? 13 : 16) * layoutScale, isCompact ? 22 : 28);
+    const logSize = Math.min((isCompact ? 12 : 14) * layoutScale, isCompact ? 19 : 24);
     return {
       width,
       height,
       isCompact,
+      layoutScale,
       bottomPanelHeight,
       panelTop,
       controlsHeight,

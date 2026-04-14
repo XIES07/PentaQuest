@@ -30,6 +30,18 @@ interface VisualNode {
   iconMask?: Phaser.GameObjects.Graphics;
 }
 
+const SFX = {
+  SUMMON_BELL: "sfx_summon_bell",
+  HEAL: "sfx_heal",
+  HIT: "sfx_hit",
+  SWORD: "sfx_sword",
+  FIREBALL: "sfx_fireball",
+  ARROW: "sfx_arrow"
+} as const;
+const SFX_HIT_SKIP_SEC = 4;
+const SFX_ARROW_SKIP_SEC = 4;
+const SFX_SLIME_BALL_SKIP_SEC = 4;
+
 export class BattleScene extends Phaser.Scene {
   private readonly saveService = new SaveService();
   private readonly maxEnemiesOnField = 8;
@@ -51,6 +63,7 @@ export class BattleScene extends Phaser.Scene {
   private recruitmentOverlay: Phaser.GameObjects.GameObject[] = [];
   private summonCooldownByCasterId = new Map<string, number>();
   private skeletonSummonCooldownByEnemyId = new Map<string, number>();
+  private pendingTurnGateMs = 0;
 
   constructor() {
     super("battle");
@@ -76,6 +89,13 @@ export class BattleScene extends Phaser.Scene {
     this.load.image("summon_snake", "/assets/units/summons/snake-summon.png");
     this.load.image("summon_bear", "/assets/units/summons/bear-summon.png");
     this.load.image("summon_deer", "/assets/units/summons/deer-summon.png");
+
+    this.load.audio(SFX.SUMMON_BELL, "/assets/efects/Campana de invocacion.mp3");
+    this.load.audio(SFX.HEAL, "/assets/efects/curación.mp3");
+    this.load.audio(SFX.HIT, "/assets/efects/Sonido de golpe   efecto de sonido.mp3");
+    this.load.audio(SFX.SWORD, "/assets/efects/Sonido De espada Sonido Edit.mp3");
+    this.load.audio(SFX.FIREBALL, "/assets/efects/sound effect  de gran bola de fuego.mp3");
+    this.load.audio(SFX.ARROW, "/assets/efects/ARCO Y FLECHA efecto de sonido.mp3");
   }
 
   create(): void {
@@ -536,6 +556,7 @@ export class BattleScene extends Phaser.Scene {
     const allies = caster.team === "player" ? this.players : this.enemies;
     const enemies = caster.team === "player" ? this.enemies : this.players;
     const result = this.selectedSkill.execute({ caster, allies, enemies, targets });
+    this.playSkillSound(caster, this.selectedSkill.id);
     const extraLogs = this.handleSlimeSplitAfterHit(enemyHpBefore);
     this.afterAction([...result.logs, ...extraLogs], 1400, caster, targets);
   }
@@ -545,6 +566,11 @@ export class BattleScene extends Phaser.Scene {
     const summon = this.createMageSummon(caster, summonType);
     this.players.push(summon);
     this.summonCooldownByCasterId.set(caster.id, 3);
+    if (summonType === "healer") {
+      this.queueTurnSound(SFX.HEAL, 0.65);
+    } else {
+      this.queueTurnSound(SFX.SUMMON_BELL, 0.65);
+    }
     this.renderCurrentWaveVisuals();
     this.afterAction([`${caster.name} invoca ${summon.name}.`], 1450, caster, [summon]);
   }
@@ -626,6 +652,7 @@ export class BattleScene extends Phaser.Scene {
           .filter((ally) => ally.isAlive && ally.stats.hp < ally.stats.maxHp)
           .sort((a, b) => a.stats.hp / a.stats.maxHp - b.stats.hp / b.stats.maxHp)[0] ?? summon;
       const healed = allyTarget.heal(Math.round(summon.stats.healPower * 0.9));
+      this.queueTurnSound(SFX.HEAL, 0.62);
       this.afterAction(
         [`${summon.name} cura a ${allyTarget.name} por ${healed}.`],
         1200,
@@ -644,10 +671,12 @@ export class BattleScene extends Phaser.Scene {
     if (summon.summonType === "bear") {
       if (Math.random() < 0.5) {
         summon.tauntTurns = 1;
+        this.queueTurnSound(SFX.SWORD, 0.62);
         this.afterAction([`${summon.name} provoca para proteger al equipo.`], 1200, summon, [summon]);
         return;
       }
       const dealt = enemyTarget.receiveDamage(Math.round(summon.stats.attack * 0.7));
+      this.queueTurnSound(SFX.HIT, 0.62, SFX_HIT_SKIP_SEC);
       this.afterAction([`${summon.name} embiste a ${enemyTarget.name} por ${dealt}.`], 1200, summon, [enemyTarget]);
       return;
     }
@@ -656,6 +685,7 @@ export class BattleScene extends Phaser.Scene {
     const ratio = strongHit ? 1.05 : 0.85;
     const dealt = enemyTarget.receiveDamage(Math.round(summon.stats.attack * ratio));
     const moveName = strongHit ? "Colmillo Venenoso" : "Mordisco";
+    this.queueTurnSound(SFX.HIT, 0.62, SFX_HIT_SKIP_SEC);
     this.afterAction(
       [`${summon.name} usa ${moveName} sobre ${enemyTarget.name} (${dealt}).`],
       1200,
@@ -675,6 +705,7 @@ export class BattleScene extends Phaser.Scene {
     if (enemy.kind === "skeleton_mage" && this.shouldSkeletonMageSummon(enemy)) {
       const logs = this.summonSkeletonMinions();
       this.skeletonSummonCooldownByEnemyId.set(enemy.id, 3);
+      this.queueTurnSound(SFX.SUMMON_BELL, 0.66);
       this.afterAction(logs, 1400, enemy, []);
       return;
     }
@@ -714,6 +745,7 @@ export class BattleScene extends Phaser.Scene {
     }
 
     const dealt = target.receiveDamage(Math.round(enemy.stats.attack * (0.9 + Math.random() * 0.3)));
+    this.playEnemyAttackSound(enemy);
     const logs = [`${enemy.name} ataca a ${target.name} por ${dealt}.`];
     if (target.tauntTurns > 0) target.tauntTurns -= 1;
     if (target.thornsTurns > 0 && target.thornsReflectRatio > 0 && enemy.isAlive) {
@@ -742,7 +774,9 @@ export class BattleScene extends Phaser.Scene {
     this.runState.logHistory.push(message);
     this.saveService.save(this.runState);
 
-    this.time.delayedCall(delay, () => {
+    const gateDelay = this.pendingTurnGateMs > 0 ? this.pendingTurnGateMs : delay;
+    this.pendingTurnGateMs = 0;
+    this.time.delayedCall(gateDelay, () => {
       this.turnIndex += 1;
       this.processTurn();
     });
@@ -1110,28 +1144,43 @@ export class BattleScene extends Phaser.Scene {
 
   private playActionAnimation(actor?: Character, targets: Character[] = []): void {
     const primaryTarget = targets[0];
+    let destination: { x: number; y: number } | null = null;
+    if (primaryTarget) {
+      const targetNode = this.visuals.get(primaryTarget.id);
+      if (targetNode) {
+        destination = { x: targetNode.body.x, y: targetNode.body.y };
+      } else if (primaryTarget.team === "player") {
+        destination = this.hud.getPartyCardCenter(primaryTarget.id);
+      }
+    }
     if (actor) {
       const node = this.visuals.get(actor.id);
       if (node) {
-        if (primaryTarget) {
-          const targetNode = this.visuals.get(primaryTarget.id);
-          if (targetNode) {
-            const dx = targetNode.body.x - node.body.x;
-            const dy = targetNode.body.y - node.body.y;
-            const dist = Math.hypot(dx, dy) || 1;
-            const step = Math.min(32, dist * 0.2);
-            const moveX = (dx / dist) * step;
-            const moveY = (dy / dist) * step;
-
-            this.tweens.add({
-              targets: [node.body, node.icon, node.name, node.hp, node.targetZone],
-              x: `+=${moveX}`,
-              y: `+=${moveY}`,
-              duration: 140,
-              yoyo: true,
-              ease: "Quad.easeOut"
-            });
+        if (destination) {
+          const dx = destination.x - node.body.x;
+          const dy = destination.y - node.body.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const step = Math.min(58, dist * 0.22);
+          const moveX = (dx / dist) * step;
+          const moveY = (dy / dist) * step;
+          const actorTargets: Phaser.GameObjects.GameObject[] = [
+            node.body,
+            node.icon,
+            node.name,
+            node.hp,
+            node.targetZone
+          ];
+          if (node.iconMask) {
+            actorTargets.push(node.iconMask);
           }
+          this.tweens.add({
+            targets: actorTargets,
+            x: `+=${moveX}`,
+            y: `+=${moveY}`,
+            duration: 160,
+            yoyo: true,
+            ease: "Quad.easeOut"
+          });
         } else {
           this.tweens.add({
             targets: [node.body, node.icon],
@@ -1140,6 +1189,8 @@ export class BattleScene extends Phaser.Scene {
             yoyo: true
           });
         }
+      } else if (actor.team === "player" && destination) {
+        this.hud.animatePartyMemberTowards(actor.id, destination);
       }
     }
     targets.forEach((target, index) => {
@@ -1199,6 +1250,78 @@ export class BattleScene extends Phaser.Scene {
 
   private getTypographyScale(): number {
     return getTypographyScale(loadTypographyMode());
+  }
+
+  private playSfx(key: string, volume = 0.6, skipSec?: number): number {
+    if (this.sound.locked) {
+      return 0;
+    }
+    const instance = this.sound.add(key);
+    const skip = skipSec ?? 0;
+    const rawDurationSec = Math.max(0, instance.duration || 0);
+    const seekSec = rawDurationSec > skip ? skip : 0;
+    const remainingDurationSec = Math.max(0, rawDurationSec - seekSec);
+    const durationMs = Math.round(remainingDurationSec * 1000);
+    instance.play({ volume, seek: seekSec });
+    instance.once("complete", () => instance.destroy());
+    return durationMs;
+  }
+
+  private queueTurnSound(key: string, volume = 0.6, skipSec?: number): void {
+    const durationMs = this.playSfx(key, volume, skipSec);
+    this.pendingTurnGateMs = Math.max(this.pendingTurnGateMs, durationMs);
+  }
+
+  private playSkillSound(caster: Character, skillId: string): void {
+    if (caster.id.includes("ranger")) {
+      this.queueTurnSound(SFX.ARROW, 0.64, SFX_ARROW_SKIP_SEC);
+      return;
+    }
+    if (caster.id.includes("tank") && skillId === "taunt") {
+      this.queueTurnSound(SFX.SWORD, 0.62);
+      return;
+    }
+    if (caster.id.includes("tank")) {
+      this.queueTurnSound(SFX.HIT, 0.62, SFX_HIT_SKIP_SEC);
+      return;
+    }
+    if (caster.id.includes("swordsman")) {
+      this.queueTurnSound(SFX.SWORD, 0.62);
+      return;
+    }
+    if (caster.id.includes("healer")) {
+      this.queueTurnSound(SFX.HEAL, 0.6);
+      return;
+    }
+    if (caster.id.includes("mage")) {
+      if (skillId === "summon_storm") {
+        this.queueTurnSound(SFX.SUMMON_BELL, 0.66);
+      } else {
+        this.queueTurnSound(SFX.FIREBALL, 0.62);
+      }
+      return;
+    }
+    this.queueTurnSound(SFX.HIT, 0.6, SFX_HIT_SKIP_SEC);
+  }
+
+  private playEnemyAttackSound(enemy: Enemy): void {
+    if (enemy.kind === "slime_blob") {
+      this.queueTurnSound(SFX.HIT, 0.66, SFX_SLIME_BALL_SKIP_SEC);
+      return;
+    }
+    if (enemy.kind === "skeleton_mage") {
+      this.queueTurnSound(SFX.FIREBALL, 0.64);
+      return;
+    }
+    if (enemy.kind === "skeleton_minion" || enemy.kind === "demon") {
+      this.queueTurnSound(SFX.SWORD, 0.66);
+      return;
+    }
+    if (enemy.kind === "slime") {
+      this.queueTurnSound(SFX.HIT, 0.62, SFX_HIT_SKIP_SEC);
+      return;
+    }
+    this.queueTurnSound(SFX.HIT, 0.6, SFX_HIT_SKIP_SEC);
   }
 
   private getTextureKey(character: Character): string | null {

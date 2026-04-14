@@ -4,18 +4,25 @@ import { GameOverScene } from "./scenes/GameOverScene";
 import { SelectionScene } from "./scenes/SelectionScene";
 import { SCENE_BATTLE, SCENE_GAME_OVER, SCENE_SELECTION } from "./scenes/SceneKeys";
 
+const initialWidth = Math.max(1, window.innerWidth);
+const initialHeight = Math.max(1, window.innerHeight);
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: window.innerWidth,
-  height: window.innerHeight,
+  width: initialWidth,
+  height: initialHeight,
   parent: "app",
   backgroundColor: "#111122",
   scene: [SelectionScene, BattleScene, GameOverScene],
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: "100%",
-    height: "100%"
+    width: initialWidth,
+    height: initialHeight,
+    min: {
+      width: 320,
+      height: 240
+    }
   },
   autoRound: true
 };

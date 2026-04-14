@@ -6,6 +6,7 @@ import { SCENE_BATTLE } from "./SceneKeys";
 
 export class SelectionScene extends Phaser.Scene {
   private readonly saveService = new SaveService();
+  private static readonly MENU_BGM_KEY = "bgm_main_menu";
 
   constructor() {
     super("selection");
@@ -17,10 +18,12 @@ export class SelectionScene extends Phaser.Scene {
     this.load.image("sel_player_mage", "/assets/units/players/mage.png");
     this.load.image("sel_player_healer", "/assets/units/players/healer.png");
     this.load.image("sel_player_ranger", "/assets/units/players/ranger.png");
+    this.load.audio(SelectionScene.MENU_BGM_KEY, "/assets/efects/main_menu_-_dark.mp3");
   }
 
   create(): void {
     this.cameras.main.setBackgroundColor("#0b1025");
+    this.playMenuMusic();
     this.renderResponsive();
     this.scale.on("resize", () => this.renderResponsive());
   }
@@ -47,7 +50,10 @@ export class SelectionScene extends Phaser.Scene {
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
-      continueBtn.on("pointerdown", () => this.scene.start(SCENE_BATTLE, { runState: save }));
+      continueBtn.on("pointerdown", () => {
+        this.stopMenuMusic();
+        this.scene.start(SCENE_BATTLE, { runState: save });
+      });
     }
 
     const templates = getAllTemplates();
@@ -113,6 +119,21 @@ export class SelectionScene extends Phaser.Scene {
       logHistory: ["Partida iniciada."]
     };
     this.saveService.save(runState);
+    this.stopMenuMusic();
     this.scene.start(SCENE_BATTLE, { runState });
+  }
+
+  private playMenuMusic(): void {
+    const existing = this.sound.get(SelectionScene.MENU_BGM_KEY);
+    if (existing?.isPlaying) {
+      return;
+    }
+    if (!this.sound.locked) {
+      this.sound.play(SelectionScene.MENU_BGM_KEY, { loop: true, volume: 0.45 });
+    }
+  }
+
+  private stopMenuMusic(): void {
+    this.sound.stopByKey(SelectionScene.MENU_BGM_KEY);
   }
 }
