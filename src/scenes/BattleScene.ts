@@ -23,7 +23,7 @@ type TurnPhase = "idle" | "player_select_skill" | "player_select_target" | "enem
 
 interface VisualNode {
   body: Phaser.GameObjects.Rectangle;
-  icon: Phaser.GameObjects.Text;
+  icon: Phaser.GameObjects.Text | Phaser.GameObjects.Image;
   name: Phaser.GameObjects.Text;
   hp: Phaser.GameObjects.Text;
   targetZone: Phaser.GameObjects.Rectangle;
@@ -57,6 +57,24 @@ export class BattleScene extends Phaser.Scene {
 
   init(data: { runState: RunState }): void {
     this.runState = data.runState;
+  }
+
+  preload(): void {
+    this.load.image("player_swordsman", "/assets/units/players/swordman.png");
+    this.load.image("player_tank", "/assets/units/players/tank.png");
+    this.load.image("player_mage", "/assets/units/players/mage.png");
+    this.load.image("player_healer", "/assets/units/players/healer.png");
+    this.load.image("player_ranger", "/assets/units/players/ranger.png");
+
+    this.load.image("enemy_slime", "/assets/units/enemies/slime.png");
+    this.load.image("enemy_slime_blob", "/assets/units/enemies/slime_blob.png");
+    this.load.image("enemy_skeleton_mage", "/assets/units/enemies/skeleton-mague.png");
+    this.load.image("enemy_skeleton_minion", "/assets/units/enemies/skeleton_minion.png");
+    this.load.image("enemy_demon", "/assets/units/enemies/demon.png");
+
+    this.load.image("summon_snake", "/assets/units/summons/snake-summon.png");
+    this.load.image("summon_bear", "/assets/units/summons/bear-summon.png");
+    this.load.image("summon_deer", "/assets/units/summons/deer-summon.png");
   }
 
   create(): void {
@@ -178,9 +196,9 @@ export class BattleScene extends Phaser.Scene {
     this.visuals.forEach((node) => {
       if (node.body.y > battleHeight - 25) {
         node.body.y = battleHeight - 25;
-        node.icon.y = node.body.y - 8;
-        node.name.y = node.body.y + 66;
-        node.hp.y = node.body.y - 84;
+        node.icon.y = node.body.y - 10;
+        node.name.y = node.body.y + 78;
+        node.hp.y = node.body.y - 96;
         node.targetZone.y = node.body.y;
       }
       if (node.body.x < 40) {
@@ -210,28 +228,26 @@ export class BattleScene extends Phaser.Scene {
     visualScale = 1
   ): void {
     const typographyScale = this.getTypographyScale();
-    const bodyWidth = Math.round(92 * visualScale);
-    const bodyHeight = Math.round(112 * visualScale);
-    const iconSize = Math.max(24, Math.round(44 * visualScale * typographyScale));
-    const nameSize = Math.max(10, Math.round(12 * visualScale * typographyScale));
-    const hpSize = Math.max(10, Math.round(12 * visualScale * typographyScale));
-    const targetWidth = Math.round(80 * visualScale);
-    const targetHeight = Math.round(100 * visualScale);
+    const bodyWidth = Math.round(118 * visualScale);
+    const bodyHeight = Math.round(138 * visualScale);
+    const iconSize = this.getIconDisplaySize(character, visualScale);
+    const nameSize = Math.max(11, Math.round(13 * visualScale * typographyScale));
+    const hpSize = Math.max(11, Math.round(13 * visualScale * typographyScale));
+    const targetWidth = Math.round(112 * visualScale);
+    const targetHeight = Math.round(132 * visualScale);
 
     const body = this.add
-      .rectangle(x, y, bodyWidth, bodyHeight, color, 0.95)
-      .setStrokeStyle(2, 0x89b4ff)
+      .rectangle(x, y, bodyWidth, bodyHeight, color, 0.62)
+      .setStrokeStyle(3, 0x89b4ff)
       .setDepth(30);
-    const icon = this.add
-      .text(x, y - 8 * visualScale, emoji, { fontSize: `${iconSize}px` })
-      .setOrigin(0.5)
-      .setDepth(31);
+    const textureKey = this.getTextureKey(character);
+    const icon = this.createIconVisual(textureKey, emoji, x, y - 10 * visualScale, iconSize);
     const name = this.add
-      .text(x, y + 58 * visualScale, character.name, { fontSize: `${nameSize}px`, color: "#ffffff" })
+      .text(x, y + 78 * visualScale, character.name, { fontSize: `${nameSize}px`, color: "#ffffff" })
       .setOrigin(0.5)
       .setDepth(32);
     const hp = this.add
-      .text(x, y - 70 * visualScale, `${character.stats.hp}/${character.stats.maxHp}`, {
+      .text(x, y - 96 * visualScale, `${character.stats.hp}/${character.stats.maxHp}`, {
         fontSize: `${hpSize}px`,
         color: "#9df2b5"
       })
@@ -244,6 +260,35 @@ export class BattleScene extends Phaser.Scene {
     targetZone.on("pointerdown", () => this.onTargetClick(character));
     this.visuals.set(character.id, { body, icon, name, hp, targetZone });
     this.paintCharacterState(character);
+  }
+
+  private getIconDisplaySize(character: Character, visualScale: number): number {
+    if (character instanceof SummonAlly) {
+      return Math.max(82, Math.round(112 * visualScale));
+    }
+    if (character.team === "enemy" && character instanceof Enemy) {
+      if (character.isMainWaveEnemy) {
+        return Math.max(92, Math.round(126 * visualScale));
+      }
+      return Math.max(78, Math.round(104 * visualScale));
+    }
+    return Math.max(92, Math.round(122 * visualScale));
+  }
+
+  private createIconVisual(
+    textureKey: string | null,
+    fallbackEmoji: string,
+    x: number,
+    y: number,
+    iconSize: number
+  ): Phaser.GameObjects.Text | Phaser.GameObjects.Image {
+    if (textureKey && this.textures.exists(textureKey)) {
+      return this.add.image(x, y, textureKey).setDisplaySize(iconSize, iconSize).setDepth(31);
+    }
+    return this.add
+      .text(x, y, fallbackEmoji, { fontSize: `${iconSize}px` })
+      .setOrigin(0.5)
+      .setDepth(31);
   }
 
   private getEnemyLayout(count: number): Array<{ x: number; y: number; scale: number }> {
@@ -275,10 +320,10 @@ export class BattleScene extends Phaser.Scene {
       }));
     };
 
-    const topRowY = Math.max(74, Math.floor(battleHeight * 0.24));
-    const bottomRowY = Math.max(topRowY + 64, Math.floor(battleHeight * 0.53));
-    const topRow = buildRow(topCount, topRowY);
-    const bottomRow = buildRow(bottomCount, bottomRowY);
+    const topRowY = Math.max(86, Math.floor(battleHeight * 0.21));
+    const bottomRowY = Math.max(topRowY + 78, Math.floor(battleHeight * 0.45));
+    const topRow = buildRow(topCount, topRowY).map((slot) => ({ ...slot, x: slot.x + width * 0.16 }));
+    const bottomRow = buildRow(bottomCount, bottomRowY).map((slot) => ({ ...slot, x: slot.x + width * 0.16 }));
     return [...topRow, ...bottomRow];
   }
 
@@ -299,7 +344,7 @@ export class BattleScene extends Phaser.Scene {
     const heroSlots = heroes.map((hero, index) => ({
       id: hero.id,
       x: heroStartX + index * heroSpacing,
-      y: Math.floor(battleHeight * 0.84),
+      y: Math.floor(battleHeight * 0.86),
       scale: isCompact ? 0.9 : 1,
       color: 0x1a2e4a
     }));
@@ -309,8 +354,8 @@ export class BattleScene extends Phaser.Scene {
     const summonSlots = summons.map((summon, index) => ({
       id: summon.id,
       x: summonStartX + index * summonSpacing,
-      y: Math.floor(battleHeight * 0.62),
-      scale: isCompact ? 0.52 : 0.64,
+      y: Math.floor(battleHeight * 0.66),
+      scale: isCompact ? 0.68 : 0.78,
       color: 0x1d3540
     }));
 
@@ -1186,12 +1231,44 @@ export class BattleScene extends Phaser.Scene {
   private getViewport(): { width: number; height: number; battleHeight: number; isCompact: boolean } {
     const width = this.scale.width;
     const height = this.scale.height;
-    const battleHeight = Math.max(250, Math.floor(height * 0.7));
+    const uiPanelHeight = this.getUiPanelHeightEstimate(height);
+    const battleHeight = Math.max(250, height - uiPanelHeight - 14);
     return { width, height, battleHeight, isCompact: width < 760 };
+  }
+
+  private getUiPanelHeightEstimate(screenHeight: number): number {
+    const textScale = this.getTypographyScale();
+    return Math.max(
+      Math.round(150 + 70 * textScale),
+      Math.floor(screenHeight * (0.28 + 0.05 * (textScale - 1)))
+    );
   }
 
   private getTypographyScale(): number {
     return getTypographyScale(loadTypographyMode());
+  }
+
+  private getTextureKey(character: Character): string | null {
+    if (character instanceof SummonAlly) {
+      if (character.summonType === "snake") return "summon_snake";
+      if (character.summonType === "bear") return "summon_bear";
+      if (character.summonType === "healer") return "summon_deer";
+      return null;
+    }
+    if (character.team === "enemy" && character instanceof Enemy) {
+      if (character.kind === "slime") return "enemy_slime";
+      if (character.kind === "slime_blob") return "enemy_slime_blob";
+      if (character.kind === "skeleton_mage") return "enemy_skeleton_mage";
+      if (character.kind === "skeleton_minion") return "enemy_skeleton_minion";
+      if (character.kind === "demon") return "enemy_demon";
+      return null;
+    }
+    if (character.id.includes("swordsman")) return "player_swordsman";
+    if (character.id.includes("tank")) return "player_tank";
+    if (character.id.includes("mage")) return "player_mage";
+    if (character.id.includes("healer")) return "player_healer";
+    if (character.id.includes("ranger")) return "player_ranger";
+    return null;
   }
 
   private getEmoji(character: Character): string {

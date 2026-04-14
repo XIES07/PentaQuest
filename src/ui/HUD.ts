@@ -14,6 +14,7 @@ export class HUD {
   private readonly onTypographyChanged: () => void;
   private textMode: TypographyMode = loadTypographyMode();
   private textScale = getTypographyScale(this.textMode);
+  private readonly topPanel: Phaser.GameObjects.Rectangle;
   private readonly bottomPanel: Phaser.GameObjects.Rectangle;
   private readonly actionPanel: Phaser.GameObjects.Rectangle;
   private readonly turnLabel: Phaser.GameObjects.Text;
@@ -45,6 +46,7 @@ export class HUD {
     this.scene = scene;
     this.onAbandon = onAbandon;
     this.onTypographyChanged = onTypographyChanged;
+    this.topPanel = scene.add.rectangle(0, 0, 10, 10, 0x050d24, 0.86).setDepth(994).setOrigin(0);
     this.bottomPanel = scene.add.rectangle(0, 0, 10, 10, 0x081232, 0.96).setDepth(995).setOrigin(0);
     this.actionPanel = scene.add.rectangle(0, 0, 10, 10, 0x111d44, 0.98).setDepth(997).setOrigin(0);
     this.turnLabel = scene.add
@@ -220,21 +222,19 @@ export class HUD {
     this.activeSkills = skills;
     this.activeSkillClick = onClick;
     this.clearSkillButtons();
-    const width = this.scene.scale.width;
-    const height = this.scene.scale.height;
-    const bottomPanelHeight = Math.max(170, Math.floor(height * 0.3));
-    const panelTop = height - bottomPanelHeight;
-    const isCompact = width < 760;
+    const metrics = this.getLayoutMetrics();
+    const { width, isCompact } = metrics;
     const buttonWidth = isCompact ? 176 * this.textScale : 220 * this.textScale;
     const buttonHeight = isCompact ? 40 * this.textScale : 46 * this.textScale;
-    const marginX = isCompact ? 10 : 16;
+    const marginX = isCompact ? 12 : 16;
     const gapX = isCompact ? 8 : 10;
+    const gapY = isCompact ? 8 : 10;
     const buttonsPerRow = Math.max(2, Math.floor((width - marginX * 2 + gapX) / (buttonWidth + gapX)));
     skills.forEach((skill, index) => {
       const row = Math.floor(index / buttonsPerRow);
       const col = index % buttonsPerRow;
       const x = marginX + col * (buttonWidth + gapX);
-      const y = panelTop + bottomPanelHeight - buttonHeight - row * (buttonHeight + 10) - 10;
+      const y = metrics.actionTop + 10 + row * (buttonHeight + gapY);
       const rect = this.scene.add
         .rectangle(x + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 0x22356e, 1)
         .setStrokeStyle(2, 0x8cc8ff)
@@ -255,7 +255,7 @@ export class HUD {
 
     if (skills.length === 0) {
       const placeholder = this.scene.add
-        .text(marginX, panelTop + bottomPanelHeight - buttonHeight - 10, "Esperando turno...", {
+        .text(marginX, metrics.actionTop + 12, "Esperando turno...", {
           fontSize: `${(isCompact ? 16 : 19) * this.textScale}px`,
           color: "#9db0db",
           backgroundColor: "#1a2238",
@@ -273,43 +273,42 @@ export class HUD {
   }
 
   layout(): void {
-    const width = this.scene.scale.width;
-    const height = this.scene.scale.height;
-    const isCompact = width < 760;
-    const bottomPanelHeight = Math.max(190 * this.textScale, Math.floor(height * (0.3 + 0.08 * (this.textScale - 1))));
-    const panelTop = height - bottomPanelHeight;
-    const queueSize = (isCompact ? 15 : 19) * this.textScale;
-    const turnSize = (isCompact ? 19 : 24) * this.textScale;
-    const logSize = (isCompact ? 17 : 21) * this.textScale;
+    const metrics = this.getLayoutMetrics();
 
-    this.bottomPanel.setPosition(0, panelTop).setSize(width, bottomPanelHeight);
-    this.actionPanel.setPosition(0, panelTop + 96).setSize(width, bottomPanelHeight - 96);
+    this.topPanel.setPosition(0, 0).setSize(metrics.width, metrics.topBarHeight);
+    this.bottomPanel.setPosition(0, metrics.panelTop).setSize(metrics.width, metrics.bottomPanelHeight);
+    this.actionPanel
+      .setPosition(0, metrics.actionTop)
+      .setSize(metrics.width, Math.max(48, metrics.bottomPanelHeight - metrics.infoHeight));
     this.turnLabel
-      .setPosition(12, panelTop + 16)
-      .setFontSize(turnSize)
-      .setWordWrapWidth(width - 24);
+      .setPosition(12, metrics.panelTop + metrics.queueSize + 16)
+      .setFontSize(metrics.turnSize)
+      .setWordWrapWidth(metrics.width - 24);
     this.logLabel
-      .setPosition(12, panelTop + 92)
-      .setFontSize(logSize)
-      .setWordWrapWidth(width - 24);
-    this.queueLabel.setPosition(12, 10).setFontSize(queueSize);
+      .setPosition(12, metrics.panelTop + metrics.queueSize + metrics.turnSize + 22)
+      .setFontSize(metrics.logSize)
+      .setWordWrapWidth(metrics.width - 24);
+    this.queueLabel
+      .setPosition(12, metrics.panelTop + 8)
+      .setFontSize(metrics.queueSize)
+      .setWordWrapWidth(metrics.width - 24);
 
-    this.historyButton.setPosition(width - 250, 10).setFontSize(queueSize);
-    this.abandonButton.setPosition(width - 560, 10).setFontSize(queueSize);
-    this.settingsButton.setPosition(width - 700, 10).setFontSize(queueSize);
-    this.historyPanelBg.setPosition(width * 0.5, Math.max(140, height * 0.28));
-    this.historyPanelBg.setSize(Math.min(width * 0.9, 500), Math.min(height * 0.42, 330));
+    this.historyButton.setPosition(metrics.width - 250, 10).setFontSize(metrics.queueSize);
+    this.abandonButton.setPosition(metrics.width - 560, 10).setFontSize(metrics.queueSize);
+    this.settingsButton.setPosition(metrics.width - 700, 10).setFontSize(metrics.queueSize);
+    this.historyPanelBg.setPosition(metrics.width * 0.5, Math.max(140, metrics.height * 0.28));
+    this.historyPanelBg.setSize(Math.min(metrics.width * 0.9, 500), Math.min(metrics.height * 0.42, 330));
     this.historyPanelText
       .setPosition(this.historyPanelBg.x - this.historyPanelBg.width / 2 + 14, this.historyPanelBg.y - this.historyPanelBg.height / 2 + 12)
-      .setFontSize((isCompact ? 13 : 15) * this.textScale)
+      .setFontSize((metrics.isCompact ? 13 : 15) * this.textScale)
       .setWordWrapWidth(this.historyPanelBg.width - 24);
 
-    this.settingsPanelBg.setPosition(width * 0.5, Math.max(140, height * 0.28));
-    this.settingsPanelBg.setSize(Math.min(width * 0.84, 420), Math.min(height * 0.42, 280));
+    this.settingsPanelBg.setPosition(metrics.width * 0.5, Math.max(140, metrics.height * 0.28));
+    this.settingsPanelBg.setSize(Math.min(metrics.width * 0.84, 420), Math.min(metrics.height * 0.42, 280));
     this.settingsTitle
       .setPosition(this.settingsPanelBg.x, this.settingsPanelBg.y - this.settingsPanelBg.height * 0.32)
-      .setFontSize((isCompact ? 18 : 22) * this.textScale);
-    const btnFont = (isCompact ? 14 : 16) * this.textScale;
+      .setFontSize((metrics.isCompact ? 18 : 22) * this.textScale);
+    const btnFont = (metrics.isCompact ? 14 : 16) * this.textScale;
     this.settingNormalBtn
       .setPosition(this.settingsPanelBg.x, this.settingsPanelBg.y - this.settingsPanelBg.height * 0.08)
       .setFontSize(btnFont);
@@ -318,15 +317,61 @@ export class HUD {
       .setPosition(this.settingsPanelBg.x, this.settingsPanelBg.y + this.settingsPanelBg.height * 0.28)
       .setFontSize(btnFont);
 
-    const confirmWidth = Math.min(width * 0.88, 620);
-    const confirmHeight = Math.min(height * 0.34, 240);
-    this.confirmBg.setPosition(width / 2, height * 0.47).setSize(confirmWidth, confirmHeight);
+    const confirmWidth = Math.min(metrics.width * 0.88, 620);
+    const confirmHeight = Math.min(metrics.height * 0.34, 240);
+    this.confirmBg.setPosition(metrics.width / 2, metrics.height * 0.47).setSize(confirmWidth, confirmHeight);
     this.confirmText
-      .setPosition(width / 2, this.confirmBg.y - 30)
-      .setFontSize((isCompact ? 20 : 24) * this.textScale)
+      .setPosition(metrics.width / 2, this.confirmBg.y - 30)
+      .setFontSize((metrics.isCompact ? 20 : 24) * this.textScale)
       .setWordWrapWidth(confirmWidth - 36);
-    this.confirmYes.setPosition(width / 2 - 120, this.confirmBg.y + 64).setFontSize((isCompact ? 18 : 20) * this.textScale);
-    this.confirmNo.setPosition(width / 2 + 120, this.confirmBg.y + 64).setFontSize((isCompact ? 18 : 20) * this.textScale);
+    this.confirmYes
+      .setPosition(metrics.width / 2 - 120, this.confirmBg.y + 64)
+      .setFontSize((metrics.isCompact ? 18 : 20) * this.textScale);
+    this.confirmNo
+      .setPosition(metrics.width / 2 + 120, this.confirmBg.y + 64)
+      .setFontSize((metrics.isCompact ? 18 : 20) * this.textScale);
+  }
+
+  private getLayoutMetrics(): {
+    width: number;
+    height: number;
+    isCompact: boolean;
+    topBarHeight: number;
+    bottomPanelHeight: number;
+    panelTop: number;
+    infoHeight: number;
+    actionTop: number;
+    queueSize: number;
+    turnSize: number;
+    logSize: number;
+  } {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const isCompact = width < 760;
+    const topBarHeight = Math.round(44 + 8 * this.textScale);
+    const bottomPanelHeight = Math.max(
+      Math.round(150 + 70 * this.textScale),
+      Math.floor(height * (0.28 + 0.05 * (this.textScale - 1)))
+    );
+    const panelTop = height - bottomPanelHeight;
+    const infoHeight = Math.max(Math.round(58 + 26 * this.textScale), isCompact ? 92 : 106);
+    const actionTop = panelTop + infoHeight;
+    const queueSize = (isCompact ? 13 : 16) * this.textScale;
+    const turnSize = (isCompact ? 16 : 20) * this.textScale;
+    const logSize = (isCompact ? 14 : 18) * this.textScale;
+    return {
+      width,
+      height,
+      isCompact,
+      topBarHeight,
+      bottomPanelHeight,
+      panelTop,
+      infoHeight,
+      actionTop,
+      queueSize,
+      turnSize,
+      logSize
+    };
   }
 
   private toggleConfirm(visible: boolean): void {

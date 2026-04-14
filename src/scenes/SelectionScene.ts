@@ -11,6 +11,14 @@ export class SelectionScene extends Phaser.Scene {
     super("selection");
   }
 
+  preload(): void {
+    this.load.image("sel_player_swordsman", "/assets/units/players/swordman.png");
+    this.load.image("sel_player_tank", "/assets/units/players/tank.png");
+    this.load.image("sel_player_mage", "/assets/units/players/mage.png");
+    this.load.image("sel_player_healer", "/assets/units/players/healer.png");
+    this.load.image("sel_player_ranger", "/assets/units/players/ranger.png");
+  }
+
   create(): void {
     this.cameras.main.setBackgroundColor("#0b1025");
     this.renderResponsive();
@@ -46,7 +54,7 @@ export class SelectionScene extends Phaser.Scene {
     const columns = width >= 980 ? 5 : width >= 680 ? 3 : 2;
     const rows = Math.ceil(templates.length / columns);
     const cardWidth = Math.min(150, Math.floor((width - 30) / columns) - 12);
-    const cardHeight = compact ? 145 : 160;
+    const cardHeight = compact ? 180 : 196;
     const gapX = Math.max(12, Math.floor((width - columns * cardWidth) / (columns + 1)));
     const topY = save ? height * 0.36 : height * 0.31;
     const rawGapY = Math.floor((height * 0.9 - topY - rows * cardHeight) / Math.max(1, rows - 1));
@@ -61,8 +69,15 @@ export class SelectionScene extends Phaser.Scene {
       this.add
         .text(x, y - cardHeight * 0.26, template.nameEs, { fontSize: compact ? "14px" : "16px", color: "#ffffff", align: "center" })
         .setOrigin(0.5);
+      const textureKey = this.getSelectionTextureKey(template.role);
+      if (this.textures.exists(textureKey)) {
+        this.add
+          .image(x, y - cardHeight * 0.02, textureKey)
+          .setDisplaySize(compact ? 82 : 96, compact ? 82 : 96);
+      }
+
       this.add
-        .text(x, y - cardHeight * 0.03, `HP ${template.baseStats.maxHp}\nATK ${template.baseStats.attack}\nDEF ${template.baseStats.defense}`, {
+        .text(x, y + cardHeight * 0.17, `HP ${template.baseStats.maxHp}\nATK ${template.baseStats.attack}\nDEF ${template.baseStats.defense}`, {
           fontSize: compact ? "11px" : "12px",
           color: "#d2ddff",
           align: "center"
@@ -70,7 +85,7 @@ export class SelectionScene extends Phaser.Scene {
         .setOrigin(0.5);
 
       const btn = this.add
-        .text(x, y + cardHeight * 0.34, "Elegir", {
+        .text(x, y + cardHeight * 0.4, "Elegir", {
           fontSize: compact ? "12px" : "14px",
           color: "#121212",
           backgroundColor: "#ffd37a",
@@ -80,6 +95,14 @@ export class SelectionScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       btn.on("pointerdown", () => this.startNewRun(template.role));
     });
+  }
+
+  private getSelectionTextureKey(role: Role): string {
+    if (role === "swordsman") return "sel_player_swordsman";
+    if (role === "tank") return "sel_player_tank";
+    if (role === "mage") return "sel_player_mage";
+    if (role === "healer") return "sel_player_healer";
+    return "sel_player_ranger";
   }
 
   private startNewRun(role: Role): void {
