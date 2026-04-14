@@ -62,6 +62,10 @@ export class BattleScene extends Phaser.Scene {
     this.hud = new HUD(this);
     this.buildFloor();
     this.startBattle();
+    this.scale.on("resize", () => {
+      this.hud.layout();
+      this.renderCurrentWaveVisuals();
+    });
   }
 
   private buildFloor(): void {
@@ -97,6 +101,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private renderCurrentWaveVisuals(): void {
+    const { width, battleHeight } = this.getViewport();
     this.drawArenaByCurrentWave();
     this.visuals.forEach((node) => {
       node.body.destroy();
@@ -130,6 +135,32 @@ export class BattleScene extends Phaser.Scene {
         return;
       }
       this.createVisual(enemy, slot.x, slot.y, color, this.getEmoji(enemy), slot.scale);
+    });
+
+    // Evita que unidades se dibujen sobre el panel inferior.
+    this.visuals.forEach((node) => {
+      if (node.body.y > battleHeight - 25) {
+        node.body.y = battleHeight - 25;
+        node.icon.y = node.body.y - 4;
+        node.name.y = node.body.y + 38;
+        node.hp.y = node.body.y - 50;
+        node.targetZone.y = node.body.y;
+      }
+      if (node.body.x < 40) {
+        const delta = 40 - node.body.x;
+        node.body.x += delta;
+        node.icon.x += delta;
+        node.name.x += delta;
+        node.hp.x += delta;
+        node.targetZone.x += delta;
+      } else if (node.body.x > width - 40) {
+        const delta = node.body.x - (width - 40);
+        node.body.x -= delta;
+        node.icon.x -= delta;
+        node.name.x -= delta;
+        node.hp.x -= delta;
+        node.targetZone.x -= delta;
+      }
     });
   }
 
@@ -181,23 +212,24 @@ export class BattleScene extends Phaser.Scene {
     if (count <= 0) {
       return [];
     }
+    const { width, battleHeight, isCompact } = this.getViewport();
     const topCount = Math.ceil(count / 2);
     const bottomCount = count - topCount;
     const maxRowCount = Math.max(topCount, bottomCount, 1);
 
     // Encoge enemigos cuando la sala se llena para mantener clic y legibilidad.
-    const scale = count <= 3 ? 0.95 : count <= 5 ? 0.8 : count <= 7 ? 0.68 : 0.6;
-    const maxWidth = 820;
+    const scale = (count <= 3 ? 0.95 : count <= 5 ? 0.8 : count <= 7 ? 0.68 : 0.58) * (isCompact ? 0.86 : 1);
+    const maxWidth = Math.max(260, width - 90);
     const spacing =
       maxRowCount <= 1
         ? 0
-        : Math.max(88, Math.min(150, Math.floor(maxWidth / (maxRowCount - 1))));
+        : Math.max(66, Math.min(145, Math.floor(maxWidth / (maxRowCount - 1))));
 
     const buildRow = (rowCount: number, y: number): Array<{ x: number; y: number; scale: number }> => {
       if (rowCount <= 0) {
         return [];
       }
-      const startX = 512 - ((rowCount - 1) * spacing) / 2;
+      const startX = width / 2 - ((rowCount - 1) * spacing) / 2;
       return Array.from({ length: rowCount }, (_, i) => ({
         x: startX + i * spacing,
         y,
@@ -205,8 +237,10 @@ export class BattleScene extends Phaser.Scene {
       }));
     };
 
-    const topRow = buildRow(topCount, 112);
-    const bottomRow = buildRow(bottomCount, 252);
+    const topRowY = Math.max(74, Math.floor(battleHeight * 0.24));
+    const bottomRowY = Math.max(topRowY + 64, Math.floor(battleHeight * 0.53));
+    const topRow = buildRow(topCount, topRowY);
+    const bottomRow = buildRow(bottomCount, bottomRowY);
     return [...topRow, ...bottomRow];
   }
 
@@ -216,25 +250,29 @@ export class BattleScene extends Phaser.Scene {
     if (units.length === 0) {
       return [];
     }
+    const { width, battleHeight, isCompact } = this.getViewport();
     const heroes = units.filter((unit) => unit instanceof Player);
     const summons = units.filter((unit) => unit instanceof SummonAlly);
-    const heroSpacing = heroes.length <= 1 ? 0 : Math.max(110, Math.floor(700 / (heroes.length - 1)));
-    const heroStartX = 180;
+    const heroSpacing =
+      heroes.length <= 1
+        ? 0
+        : Math.max(72, Math.min(145, Math.floor((width - 120) / Math.max(1, heroes.length - 1))));
+    const heroStartX = heroes.length <= 1 ? width * 0.5 : Math.max(60, width * 0.18);
     const heroSlots = heroes.map((hero, index) => ({
       id: hero.id,
       x: heroStartX + index * heroSpacing,
-      y: 368,
-      scale: 1,
+      y: Math.floor(battleHeight * 0.84),
+      scale: isCompact ? 0.9 : 1,
       color: 0x1a2e4a
     }));
 
-    const summonSpacing = summons.length <= 1 ? 0 : 120;
-    const summonStartX = 360 - ((summons.length - 1) * summonSpacing) / 2;
+    const summonSpacing = summons.length <= 1 ? 0 : Math.max(68, Math.min(115, Math.floor((width - 180) / summons.length)));
+    const summonStartX = width * 0.5 - ((summons.length - 1) * summonSpacing) / 2;
     const summonSlots = summons.map((summon, index) => ({
       id: summon.id,
       x: summonStartX + index * summonSpacing,
-      y: 455,
-      scale: 0.64,
+      y: Math.floor(battleHeight * 0.62),
+      scale: isCompact ? 0.52 : 0.64,
       color: 0x1d3540
     }));
 
@@ -806,25 +844,39 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private openRecruitmentModal(options: Role[]): void {
-    const bg = this.add.rectangle(512, 300, 880, 340, 0x02020a, 0.92).setDepth(2000);
+    const { width, height, isCompact } = this.getViewport();
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const panelWidth = Math.min(width * 0.92, 920);
+    const panelHeight = Math.min(height * 0.62, 390);
+    const bg = this.add.rectangle(centerX, centerY, panelWidth, panelHeight, 0x02020a, 0.92).setDepth(2000);
     const title = this.add
-      .text(512, 180, "Reclutamiento (cada 2 pisos)", { fontSize: "30px", color: "#ffffff" })
+      .text(centerX, centerY - panelHeight * 0.35, "Reclutamiento (cada 2 pisos)", {
+        fontSize: isCompact ? "20px" : "30px",
+        color: "#ffffff"
+      })
       .setOrigin(0.5)
       .setDepth(2001);
     const subtitle = this.add
-      .text(512, 220, "Elige un personaje para sumar al equipo", { fontSize: "18px", color: "#ffd37a" })
+      .text(centerX, centerY - panelHeight * 0.22, "Elige un personaje para sumar al equipo", {
+        fontSize: isCompact ? "14px" : "18px",
+        color: "#ffd37a"
+      })
       .setOrigin(0.5)
       .setDepth(2001);
     this.recruitmentOverlay = [bg, title, subtitle];
 
     options.forEach((role, index) => {
       const template = getTemplate(role);
+      const total = options.length;
+      const btnX = centerX + (index - (total - 1) / 2) * (isCompact ? 170 : 300);
+      const btnY = centerY + panelHeight * 0.03;
       const btn = this.add
-        .text(360 + index * 300, 300, `[${index + 1}] ${template.nameEs}`, {
-          fontSize: "24px",
+        .text(btnX, btnY, `[${index + 1}] ${template.nameEs}`, {
+          fontSize: isCompact ? "18px" : "24px",
           color: "#0a0a0a",
           backgroundColor: "#87f5b0",
-          padding: { x: 12, y: 8 }
+          padding: { x: isCompact ? 10 : 12, y: isCompact ? 6 : 8 }
         })
         .setDepth(2001)
         .setOrigin(0.5)
@@ -943,35 +995,45 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawArenaByCurrentWave(): void {
+    const { width, battleHeight } = this.getViewport();
     this.arenaObjects.forEach((obj) => obj.destroy());
     this.arenaObjects = [];
     const mainEnemy = this.enemyWave[this.enemyWaveIndex];
     const kind = mainEnemy?.kind ?? "slime";
+    const centerX = width / 2;
+    const arenaMidY = Math.floor(battleHeight * 0.45);
 
     if (kind === "slime") {
-      const grass = this.add.rectangle(512, 220, 1024, 420, 0x315a2b, 1).setDepth(-20);
-      const dirt = this.add.rectangle(512, 300, 1024, 260, 0x4d6b33, 0.9).setDepth(-19);
-      const trees = [140, 300, 830, 940].map((x) =>
-        this.add.circle(x, 120, 28, 0x1e3f1c, 1).setDepth(-18)
+      const grass = this.add.rectangle(centerX, arenaMidY - 40, width, battleHeight, 0x315a2b, 1).setDepth(-20);
+      const dirt = this.add.rectangle(centerX, arenaMidY + 30, width, Math.floor(battleHeight * 0.6), 0x4d6b33, 0.9).setDepth(-19);
+      const trees = [0.11, 0.27, 0.78, 0.92].map((xRatio) =>
+        this.add.circle(Math.floor(width * xRatio), Math.floor(battleHeight * 0.22), 24, 0x1e3f1c, 1).setDepth(-18)
       );
       this.arenaObjects.push(grass, dirt, ...trees);
       return;
     }
     if (kind === "skeleton_mage") {
-      const field = this.add.rectangle(512, 220, 1024, 420, 0x11213d, 1).setDepth(-20);
-      const moonShade = this.add.rectangle(512, 300, 1024, 260, 0x1b2f50, 0.92).setDepth(-19);
-      const rocks = [170, 420, 760, 920].map((x) =>
-        this.add.rectangle(x, 145, 46, 30, 0x30476e, 0.9).setDepth(-18)
+      const field = this.add.rectangle(centerX, arenaMidY - 40, width, battleHeight, 0x11213d, 1).setDepth(-20);
+      const moonShade = this.add.rectangle(centerX, arenaMidY + 30, width, Math.floor(battleHeight * 0.6), 0x1b2f50, 0.92).setDepth(-19);
+      const rocks = [0.16, 0.41, 0.73, 0.9].map((xRatio) =>
+        this.add.rectangle(Math.floor(width * xRatio), Math.floor(battleHeight * 0.26), 46, 30, 0x30476e, 0.9).setDepth(-18)
       );
       this.arenaObjects.push(field, moonShade, ...rocks);
       return;
     }
-    const dungeon = this.add.rectangle(512, 220, 1024, 420, 0x3a1010, 1).setDepth(-20);
-    const tiles = this.add.rectangle(512, 300, 1024, 260, 0x5b1a1a, 0.92).setDepth(-19);
-    const torches = [120, 310, 700, 900].map((x) =>
-      this.add.circle(x, 130, 14, 0xff6a00, 0.9).setDepth(-18)
+    const dungeon = this.add.rectangle(centerX, arenaMidY - 40, width, battleHeight, 0x3a1010, 1).setDepth(-20);
+    const tiles = this.add.rectangle(centerX, arenaMidY + 30, width, Math.floor(battleHeight * 0.6), 0x5b1a1a, 0.92).setDepth(-19);
+    const torches = [0.12, 0.3, 0.69, 0.88].map((xRatio) =>
+      this.add.circle(Math.floor(width * xRatio), Math.floor(battleHeight * 0.24), 14, 0xff6a00, 0.9).setDepth(-18)
     );
     this.arenaObjects.push(dungeon, tiles, ...torches);
+  }
+
+  private getViewport(): { width: number; height: number; battleHeight: number; isCompact: boolean } {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const battleHeight = Math.max(250, Math.floor(height * 0.7));
+    return { width, height, battleHeight, isCompact: width < 760 };
   }
 
   private getEmoji(character: Character): string {

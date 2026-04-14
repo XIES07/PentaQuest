@@ -6,15 +6,18 @@ import { SCENE_BATTLE, SCENE_GAME_OVER, SCENE_SELECTION } from "./scenes/SceneKe
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 1024,
-  height: 600,
+  width: window.innerWidth,
+  height: window.innerHeight,
   parent: "app",
   backgroundColor: "#111122",
   scene: [SelectionScene, BattleScene, GameOverScene],
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  }
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: "100%",
+    height: "100%"
+  },
+  autoRound: true
 };
 
 window.addEventListener("load", () => {

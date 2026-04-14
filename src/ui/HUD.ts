@@ -4,6 +4,7 @@ import type { ISkill } from "../skills/ISkill";
 
 export class HUD {
   private readonly scene: Phaser.Scene;
+  private readonly bottomPanel: Phaser.GameObjects.Rectangle;
   private readonly turnLabel: Phaser.GameObjects.Text;
   private readonly logLabel: Phaser.GameObjects.Text;
   private readonly queueLabel: Phaser.GameObjects.Text;
@@ -16,8 +17,9 @@ export class HUD {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    this.bottomPanel = scene.add.rectangle(0, 0, 10, 10, 0x081232, 0.96).setDepth(995).setOrigin(0);
     this.turnLabel = scene.add
-      .text(16, 470, "", { fontSize: "18px", color: "#ffffff" })
+      .text(16, 470, "", { fontSize: "18px", color: "#ffffff", wordWrap: { width: 920 } })
       .setDepth(1000);
     this.logLabel = scene.add
       .text(16, 500, "Listo", { fontSize: "16px", color: "#d2d2d2", wordWrap: { width: 980 } })
@@ -51,6 +53,9 @@ export class HUD {
       .setDepth(1091);
     this.historyPanelBg.setVisible(false);
     this.historyPanelText.setVisible(false);
+
+    this.layout();
+    scene.scale.on("resize", () => this.layout());
   }
 
   setTurnText(value: string): void {
@@ -86,15 +91,30 @@ export class HUD {
 
   renderSkills(skills: ISkill[], onClick: (skill: ISkill) => void): void {
     this.clearSkillButtons();
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const bottomPanelHeight = Math.max(170, Math.floor(height * 0.3));
+    const panelTop = height - bottomPanelHeight;
+    const isCompact = width < 760;
+    const buttonWidth = isCompact ? 160 : 190;
+    const buttonHeight = isCompact ? 30 : 36;
+    const marginX = isCompact ? 10 : 16;
+    const gapX = isCompact ? 8 : 10;
+    const buttonsPerRow = Math.max(2, Math.floor((width - marginX * 2 + gapX) / (buttonWidth + gapX)));
+    const buttonStyle = {
+      fontSize: isCompact ? "14px" : "16px",
+      color: "#ffd37a",
+      backgroundColor: "#1a2238",
+      padding: { x: 8, y: 5 }
+    };
+
     skills.forEach((skill, index) => {
-      const x = 16 + index * 195;
+      const row = Math.floor(index / buttonsPerRow);
+      const col = index % buttonsPerRow;
+      const x = marginX + col * (buttonWidth + gapX);
+      const y = panelTop + bottomPanelHeight - buttonHeight - row * (buttonHeight + 8) - 8;
       const button = this.scene.add
-        .text(x, 540, `[${index + 1}] ${skill.nameEs}`, {
-          fontSize: "16px",
-          color: "#ffd37a",
-          backgroundColor: "#1a2238",
-          padding: { x: 8, y: 5 }
-        })
+        .text(x, y, `[${index + 1}] ${skill.nameEs}`, buttonStyle)
         .setInteractive({ useHandCursor: true })
         .setDepth(1000);
       button.on("pointerdown", () => onClick(skill));
@@ -106,5 +126,35 @@ export class HUD {
     this.setTurnText(
       `Turno: ${active.name} | HP ${active.stats.hp}/${active.stats.maxHp} | ATK ${active.stats.attack} | DEF ${active.stats.defense}`
     );
+  }
+
+  layout(): void {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const isCompact = width < 760;
+    const bottomPanelHeight = Math.max(170, Math.floor(height * 0.3));
+    const panelTop = height - bottomPanelHeight;
+    const queueSize = isCompact ? "12px" : "14px";
+    const turnSize = isCompact ? "15px" : "18px";
+    const logSize = isCompact ? "14px" : "16px";
+
+    this.bottomPanel.setPosition(0, panelTop).setSize(width, bottomPanelHeight);
+    this.turnLabel
+      .setPosition(12, panelTop + 14)
+      .setFontSize(turnSize)
+      .setWordWrapWidth(width - 24);
+    this.logLabel
+      .setPosition(12, panelTop + 44)
+      .setFontSize(logSize)
+      .setWordWrapWidth(width - 24);
+    this.queueLabel.setPosition(12, 10).setFontSize(queueSize);
+
+    this.historyButton.setPosition(width - 100, 10).setFontSize(queueSize);
+    this.historyPanelBg.setPosition(width * 0.5, Math.max(140, height * 0.28));
+    this.historyPanelBg.setSize(Math.min(width * 0.9, 500), Math.min(height * 0.42, 330));
+    this.historyPanelText
+      .setPosition(this.historyPanelBg.x - this.historyPanelBg.width / 2 + 14, this.historyPanelBg.y - this.historyPanelBg.height / 2 + 12)
+      .setFontSize(isCompact ? "11px" : "12px")
+      .setWordWrapWidth(this.historyPanelBg.width - 24);
   }
 }

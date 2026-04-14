@@ -13,17 +13,29 @@ export class SelectionScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor("#0b1025");
-    this.add.text(512, 70, "PentaQuest", { fontSize: "46px", color: "#ffffff", fontStyle: "bold" }).setOrigin(0.5);
-    this.add.text(512, 120, "Selecciona tu heroe inicial", { fontSize: "20px", color: "#ffd37a" }).setOrigin(0.5);
+    this.renderResponsive();
+    this.scale.on("resize", () => this.renderResponsive());
+  }
+
+  private renderResponsive(): void {
+    this.children.removeAll(true);
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const compact = width < 760;
+    const titleSize = compact ? "34px" : "46px";
+    const subtitleSize = compact ? "16px" : "20px";
+
+    this.add.text(width / 2, height * 0.1, "PentaQuest", { fontSize: titleSize, color: "#ffffff", fontStyle: "bold" }).setOrigin(0.5);
+    this.add.text(width / 2, height * 0.16, "Selecciona tu heroe inicial", { fontSize: subtitleSize, color: "#ffd37a" }).setOrigin(0.5);
 
     const save = this.saveService.load();
     if (save) {
       const continueBtn = this.add
-        .text(512, 170, "[ Continuar partida ]", {
-          fontSize: "24px",
+        .text(width / 2, height * 0.24, "[ Continuar partida ]", {
+          fontSize: compact ? "18px" : "24px",
           color: "#6cf797",
           backgroundColor: "#133820",
-          padding: { x: 16, y: 8 }
+          padding: { x: compact ? 12 : 16, y: compact ? 6 : 8 }
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
@@ -31,27 +43,38 @@ export class SelectionScene extends Phaser.Scene {
     }
 
     const templates = getAllTemplates();
+    const columns = width >= 980 ? 5 : width >= 680 ? 3 : 2;
+    const rows = Math.ceil(templates.length / columns);
+    const cardWidth = Math.min(150, Math.floor((width - 30) / columns) - 12);
+    const cardHeight = compact ? 145 : 160;
+    const gapX = Math.max(12, Math.floor((width - columns * cardWidth) / (columns + 1)));
+    const topY = save ? height * 0.36 : height * 0.31;
+    const rawGapY = Math.floor((height * 0.9 - topY - rows * cardHeight) / Math.max(1, rows - 1));
+    const gapY = Math.max(12, Math.min(28, rawGapY));
+
     templates.forEach((template, index) => {
-      const x = 180 + index * 165;
-      const y = 320;
-      this.add.rectangle(x, y, 135, 160, 0x1a2238, 1).setStrokeStyle(2, 0x35508a);
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      const x = gapX + cardWidth / 2 + col * (cardWidth + gapX);
+      const y = topY + row * (cardHeight + gapY);
+      this.add.rectangle(x, y, cardWidth, cardHeight, 0x1a2238, 1).setStrokeStyle(2, 0x35508a);
       this.add
-        .text(x, y - 40, template.nameEs, { fontSize: "16px", color: "#ffffff", align: "center" })
+        .text(x, y - cardHeight * 0.26, template.nameEs, { fontSize: compact ? "14px" : "16px", color: "#ffffff", align: "center" })
         .setOrigin(0.5);
       this.add
-        .text(x, y - 5, `HP ${template.baseStats.maxHp}\nATK ${template.baseStats.attack}\nDEF ${template.baseStats.defense}`, {
-          fontSize: "12px",
+        .text(x, y - cardHeight * 0.03, `HP ${template.baseStats.maxHp}\nATK ${template.baseStats.attack}\nDEF ${template.baseStats.defense}`, {
+          fontSize: compact ? "11px" : "12px",
           color: "#d2ddff",
           align: "center"
         })
         .setOrigin(0.5);
 
       const btn = this.add
-        .text(x, y + 55, "Elegir", {
-          fontSize: "14px",
+        .text(x, y + cardHeight * 0.34, "Elegir", {
+          fontSize: compact ? "12px" : "14px",
           color: "#121212",
           backgroundColor: "#ffd37a",
-          padding: { x: 10, y: 5 }
+          padding: { x: compact ? 8 : 10, y: compact ? 4 : 5 }
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
