@@ -12,5 +12,5 @@
     "rootDir": ".",
     "lib": ["ES2020", "DOM"]
   },
-  "include": ["src/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "vite.config.ts", "capacitor.config.ts"]
 }

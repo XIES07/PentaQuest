@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PentaQuest</string>
+    <string name="title_activity_main">PentaQuest</string>
+    <string name="package_name">com.javsa.pentaquest</string>
+    <string name="custom_url_scheme">com.javsa.pentaquest</string>
+</resources>

@@ -240,6 +240,9 @@ si, no te preocupes. yo me encargo de hacer eso manualmente
 | 2026-04-14 | Gameplay | Core loop | Se implementa flujo: seleccionar héroe inicial -> combate por turnos -> pisos infinitos -> game over/reintento | Cumplir definición de "completo" de primera versión | Ya existe vertical slice jugable | En progreso |
 | 2026-04-14 | Progresión | Party system | Se incorpora reclutamiento cada 2 pisos y desbloqueo de habilidades por supervivencia (2 pisos) | Responder dinámica solicitada para crecimiento del equipo | Mejora retención y profundidad de run | En progreso |
 | 2026-04-14 | Persistencia | Save system | Se agrega guardado local con opción de continuar partida | Evitar pérdida de progreso al salir | Experiencia de usuario continua | En progreso |
+| 2026-04-14 | UX | Historial combate | Se amplía historial interactivo a 15 movimientos | Mejorar trazabilidad durante combates largos | Mayor claridad para toma de decisiones | Hecho |
+| 2026-04-14 | Gameplay | IA enemiga avanzada | Slime se divide al recibir daño, Mago Esqueleto invoca adds, Demonio invoca refuerzos en 75% y 25% de vida | Aumentar profundidad táctica y variedad | Combates con prioridad de objetivos dinámica | Hecho |
+| 2026-04-14 | Visual | Escenario y feedback | Se añaden fondos por sala (campo, noche azul, mazmorra roja) y animaciones de acción | Mejorar legibilidad y sensación de impacto | Mayor inmersión y feedback de batalla | Hecho |
 
 ---
 
@@ -253,10 +256,10 @@ si, no te preocupes. yo me encargo de hacer eso manualmente
 
 ## 12) Próximo paso inmediato
 
-Terminar hardening técnico del MVP inicial:
+Siguiente iteración de gameplay:
 
-1. Validar compilación TypeScript y lint sin errores.
-2. Ajustar balance base de daño/vida según primeras pruebas.
-3. Refinar HUD (orden de turnos visible y feedback de recompensas).
-4. Registrar decisiones de ajuste en sección 10.
+1. Ajustar balance de tasas de invocación por tipo de enemigo.
+2. Definir límite duro de enemigos en campo y comportamiento de overflow.
+3. Añadir VFX/sonido por tipo de acción (golpe, curación, invocación).
+4. Introducir tooltips de estados para facilitar lectura táctica.
 
