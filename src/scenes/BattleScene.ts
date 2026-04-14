@@ -16,7 +16,7 @@ import type { Character } from "../entities/Character";
 import { SKILLS } from "../skills/SkillImplementations";
 import type { ISkill, SkillContext } from "../skills/ISkill";
 import { HUD } from "../ui/HUD";
-import { SCENE_GAME_OVER } from "./SceneKeys";
+import { SCENE_GAME_OVER, SCENE_SELECTION } from "./SceneKeys";
 
 type TurnPhase = "idle" | "player_select_skill" | "player_select_target" | "enemy_action" | "resolving";
 
@@ -59,7 +59,7 @@ export class BattleScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor("#12172e");
-    this.hud = new HUD(this);
+    this.hud = new HUD(this, () => this.abandonRun());
     this.buildFloor();
     this.startBattle();
     this.scale.on("resize", () => {
@@ -141,9 +141,9 @@ export class BattleScene extends Phaser.Scene {
     this.visuals.forEach((node) => {
       if (node.body.y > battleHeight - 25) {
         node.body.y = battleHeight - 25;
-        node.icon.y = node.body.y - 4;
-        node.name.y = node.body.y + 38;
-        node.hp.y = node.body.y - 50;
+        node.icon.y = node.body.y - 6;
+        node.name.y = node.body.y + 44;
+        node.hp.y = node.body.y - 56;
         node.targetZone.y = node.body.y;
       }
       if (node.body.x < 40) {
@@ -174,9 +174,9 @@ export class BattleScene extends Phaser.Scene {
   ): void {
     const bodyWidth = Math.round(92 * visualScale);
     const bodyHeight = Math.round(112 * visualScale);
-    const iconSize = Math.max(24, Math.round(44 * visualScale));
-    const nameSize = Math.max(10, Math.round(12 * visualScale));
-    const hpSize = Math.max(10, Math.round(12 * visualScale));
+    const iconSize = Math.max(30, Math.round(52 * visualScale));
+    const nameSize = Math.max(14, Math.round(18 * visualScale));
+    const hpSize = Math.max(13, Math.round(16 * visualScale));
     const targetWidth = Math.round(80 * visualScale);
     const targetHeight = Math.round(100 * visualScale);
 
@@ -185,7 +185,7 @@ export class BattleScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x89b4ff)
       .setDepth(30);
     const icon = this.add
-      .text(x, y - 4 * visualScale, emoji, { fontSize: `${iconSize}px` })
+      .text(x, y - 6 * visualScale, emoji, { fontSize: `${iconSize}px` })
       .setOrigin(0.5)
       .setDepth(31);
     const name = this.add
@@ -312,6 +312,7 @@ export class BattleScene extends Phaser.Scene {
   private processTurn(): void {
     this.cleanupInput();
     this.selectedSkill = null;
+    this.hud.renderSkills([], () => undefined);
     if (this.players.every((p) => !p.isAlive)) {
       this.finishRun();
       return;
@@ -980,7 +981,7 @@ export class BattleScene extends Phaser.Scene {
       });
       const marker = this.add
         .text(node.body.x, node.body.y - 84, target.team === "enemy" ? "⚔️" : "✨", {
-          fontSize: "24px"
+          fontSize: "30px"
         })
         .setOrigin(0.5)
         .setDepth(80);
@@ -1061,6 +1062,11 @@ export class BattleScene extends Phaser.Scene {
   private finishRun(): void {
     this.saveService.clear();
     this.scene.start(SCENE_GAME_OVER, { reachedFloor: this.runState.floor, bestFloor: this.runState.bestFloor });
+  }
+
+  private abandonRun(): void {
+    this.saveService.clear();
+    this.scene.start(SCENE_SELECTION);
   }
 
   private cleanupInput(): void {
