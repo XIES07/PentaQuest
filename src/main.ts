@@ -8,6 +8,38 @@ const initialWidth = Math.max(1, window.innerWidth);
 const initialHeight = Math.max(1, window.innerHeight);
 const renderResolution = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
 
+const installHighQualityTextFactory = (): void => {
+  type TextFactory = (
+    this: Phaser.GameObjects.GameObjectFactory,
+    x: number,
+    y: number,
+    text: string | string[],
+    style?: Phaser.Types.GameObjects.Text.TextStyle
+  ) => Phaser.GameObjects.Text;
+  const factoryProto = Phaser.GameObjects.GameObjectFactory.prototype as unknown as {
+    text?: TextFactory;
+    __hqTextPatched?: boolean;
+  };
+  const original = factoryProto.text;
+  if (!original || factoryProto.__hqTextPatched) {
+    return;
+  }
+  const textResolution = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+  factoryProto.text = function (
+    this: Phaser.GameObjects.GameObjectFactory,
+    x: number,
+    y: number,
+    text: string | string[],
+    style?: Phaser.Types.GameObjects.Text.TextStyle
+  ): Phaser.GameObjects.Text {
+    const created = original.call(this, x, y, text, style);
+    created.setResolution(textResolution);
+    return created;
+  };
+  factoryProto.__hqTextPatched = true;
+};
+installHighQualityTextFactory();
+
 const config = {
   type: Phaser.AUTO,
   width: initialWidth,
