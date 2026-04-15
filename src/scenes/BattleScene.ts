@@ -16,6 +16,7 @@ import { SummonAlly, type SummonType } from "../entities/SummonAlly";
 import type { Character } from "../entities/Character";
 import { SKILLS } from "../skills/SkillImplementations";
 import type { ISkill, SkillContext } from "../skills/ISkill";
+import { installViewportPan } from "../core/ViewportPan";
 import { HUD } from "../ui/HUD";
 import { SCENE_GAME_OVER, SCENE_SELECTION } from "./SceneKeys";
 
@@ -64,6 +65,7 @@ export class BattleScene extends Phaser.Scene {
   private summonCooldownByCasterId = new Map<string, number>();
   private skeletonSummonCooldownByEnemyId = new Map<string, number>();
   private pendingTurnGateMs = 0;
+  private battleSpeed2x = false;
 
   private static readonly BGM_COMBAT_KEY = "bgm_combat";
   private static readonly BGM_COMBAT_MARKER = "combat_loop";
@@ -111,7 +113,9 @@ export class BattleScene extends Phaser.Scene {
     this.hud = new HUD(
       this,
       () => this.abandonRun(),
-      () => this.renderCurrentWaveVisuals()
+      () => this.renderCurrentWaveVisuals(),
+      () => this.getBattlePace(),
+      (enabled) => this.setBattleSpeed2x(enabled)
     );
     this.hud.setPartySelectHandler((targetId) => this.onPartyTargetClick(targetId));
     this.buildFloor();
@@ -120,6 +124,7 @@ export class BattleScene extends Phaser.Scene {
       this.hud.layout();
       this.renderCurrentWaveVisuals();
     });
+    installViewportPan(this);
   }
 
   private readonly onCombatBgmComplete = (): void => {
@@ -132,6 +137,7 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     music.play(marker);
+    this.applyBattleMusicPlaybackRate();
   };
 
   private startCombatMusic(): void {
@@ -158,6 +164,7 @@ export class BattleScene extends Phaser.Scene {
         return;
       }
       music.play(marker);
+      this.applyBattleMusicPlaybackRate();
     };
     if (!this.sound.locked) {
       start();
@@ -171,6 +178,32 @@ export class BattleScene extends Phaser.Scene {
     const music = this.sound.get(key);
     music?.off(Phaser.Sound.Events.COMPLETE, this.onCombatBgmComplete);
     this.sound.stopByKey(key);
+  }
+
+  private getBattlePace(): number {
+    return this.battleSpeed2x ? 2 : 1;
+  }
+
+  private setBattleSpeed2x(enabled: boolean): void {
+    this.battleSpeed2x = enabled;
+    this.applyBattleMusicPlaybackRate();
+  }
+
+  private scaleBattleMs(ms: number): number {
+    if (!this.battleSpeed2x) {
+      return ms;
+    }
+    return Math.max(80, Math.round(ms / 2));
+  }
+
+  private applyBattleMusicPlaybackRate(): void {
+    const m = this.sound.get(BattleScene.BGM_COMBAT_KEY) as
+      | (Phaser.Sound.BaseSound & { setRate?: (r: number) => void })
+      | undefined;
+    if (!m?.isPlaying || typeof m.setRate !== "function") {
+      return;
+    }
+    m.setRate(this.battleSpeed2x ? 2 : 1);
   }
 
   private buildFloor(): void {
@@ -264,13 +297,13 @@ export class BattleScene extends Phaser.Scene {
       if (node.body.y > battleHeight - 25) {
         node.body.y = battleHeight - 25;
         node.icon.y = node.body.y;
-        node.name.y = node.body.y + 84;
-        node.hp.y = node.body.y - 86;
+        node.name.y = node.body.y + 78;
         node.targetZone.y = node.body.y;
+        node.hp.setPosition(node.icon.x, node.icon.y + 12);
         node.iconMask?.destroy();
         if (node.icon instanceof Phaser.GameObjects.Image) {
           const iconMask = this.add.graphics({ x: 0, y: 0 }).setVisible(false);
-          const radius = Math.floor(node.icon.displayWidth * 0.48);
+          const radius = Math.max(20, Math.floor(Math.min(node.icon.displayWidth, node.icon.displayHeight) / 2) - 3);
           iconMask.fillStyle(0xffffff);
           iconMask.fillCircle(node.icon.x, node.icon.y, radius);
           node.icon.setMask(iconMask.createGeometryMask());
@@ -305,29 +338,38 @@ export class BattleScene extends Phaser.Scene {
   ): void {
     const typographyScale = this.getTypographyScale();
     const bodySize = Math.round(124 * visualScale);
-    const iconSize = this.getIconDisplaySize(character, visualScale);
+    const bodyRadiusPx = Math.floor(bodySize * 0.5);
     const nameSize = Math.max(11, Math.round(13 * visualScale * typographyScale));
-    const hpSize = Math.max(11, Math.round(13 * visualScale * typographyScale));
+    const hpSize = Math.max(12, Math.round(14 * visualScale * typographyScale));
     const targetWidth = Math.round(124 * visualScale);
     const targetHeight = Math.round(124 * visualScale);
 
+    const maxImgSide = Math.max(44, Math.floor(bodyRadiusPx * Math.SQRT2) - 10);
+    const rawIcon = this.getIconDisplaySize(character, visualScale);
+    const fittedSide = Math.min(rawIcon, maxImgSide);
+    const maskR = Math.max(22, bodyRadiusPx - 6);
+
     const body = this.add
-      .circle(x, y, Math.floor(bodySize * 0.5), 0x2f333a, 0.58)
+      .circle(x, y, bodyRadiusPx, 0x2f333a, 0.58)
       .setStrokeStyle(2, 0xbec4cf)
       .setDepth(30);
     const textureKey = this.getTextureKey(character);
-    const { icon, iconMask } = this.createIconVisual(textureKey, emoji, x, y, iconSize);
+    const { icon, iconMask } = this.createIconVisual(textureKey, emoji, x, y, fittedSide, maskR);
     const name = this.add
       .text(x, y + 84 * visualScale, character.name, { fontSize: `${nameSize}px`, color: "#eceef2" })
       .setOrigin(0.5)
       .setDepth(32);
+    const hpLift = Math.round(10 * visualScale);
     const hp = this.add
-      .text(x, y - 86 * visualScale, `${character.stats.hp}/${character.stats.maxHp}`, {
+      .text(icon.x, icon.y + hpLift, `${character.stats.hp}/${character.stats.maxHp}`, {
         fontSize: `${hpSize}px`,
-        color: "#9df2b5"
+        color: "#d4ffe6",
+        fontStyle: "bold",
+        stroke: "#05070c",
+        strokeThickness: 5
       })
       .setOrigin(0.5)
-      .setDepth(32);
+      .setDepth(36);
     const targetZone = this.add
       .rectangle(x, y, targetWidth, targetHeight, 0xffffff, 0.01)
       .setInteractive({ useHandCursor: true })
@@ -355,13 +397,15 @@ export class BattleScene extends Phaser.Scene {
     fallbackEmoji: string,
     x: number,
     y: number,
-    iconSize: number
+    iconSize: number,
+    maskRadius?: number
   ): { icon: Phaser.GameObjects.Text | Phaser.GameObjects.Image; iconMask?: Phaser.GameObjects.Graphics } {
     if (textureKey && this.textures.exists(textureKey)) {
       const icon = this.add.image(x, y, textureKey).setDisplaySize(iconSize, iconSize).setDepth(31);
       const iconMask = this.add.graphics({ x: 0, y: 0 }).setVisible(false);
       iconMask.fillStyle(0xffffff);
-      iconMask.fillCircle(x, y, Math.floor(iconSize * 0.48));
+      const r = maskRadius ?? Math.max(18, Math.floor(iconSize * 0.48));
+      iconMask.fillCircle(x, y, r);
       icon.setMask(iconMask.createGeometryMask());
       return { icon, iconMask };
     }
@@ -401,7 +445,7 @@ export class BattleScene extends Phaser.Scene {
       }));
     };
 
-    const topRowY = Math.max(74, Math.floor(battleHeight * 0.24));
+    const topRowY = Math.max(isCompact ? 118 : 96, Math.floor(battleHeight * 0.26));
     const bottomRowY = Math.max(topRowY + 88, Math.floor(battleHeight * 0.6));
     const topRow = buildRow(topCount, topRowY);
     const bottomRow = buildRow(bottomCount, bottomRowY);
@@ -412,6 +456,7 @@ export class BattleScene extends Phaser.Scene {
     const node = this.visuals.get(character.id);
     if (!node) return;
     node.hp.setText(`${character.stats.hp}/${character.stats.maxHp}`);
+    node.hp.setPosition(node.icon.x, node.icon.y + 12);
     if (!character.isAlive) {
       node.body.setAlpha(0.35);
       node.icon.setAlpha(0.45);
@@ -833,7 +878,8 @@ export class BattleScene extends Phaser.Scene {
     this.runState.logHistory.push(message);
     this.saveService.save(this.runState);
 
-    const gateDelay = this.pendingTurnGateMs > 0 ? this.pendingTurnGateMs : delay;
+    const rawGate = this.pendingTurnGateMs > 0 ? this.pendingTurnGateMs : delay;
+    const gateDelay = this.scaleBattleMs(rawGate);
     this.pendingTurnGateMs = 0;
     this.time.delayedCall(gateDelay, () => {
       this.turnIndex += 1;
@@ -1039,7 +1085,7 @@ export class BattleScene extends Phaser.Scene {
       this.hud.pushHistory(msg);
       this.runState.logHistory.push(msg);
       this.saveService.save(this.runState);
-      this.time.delayedCall(1400, () => {
+      this.time.delayedCall(this.scaleBattleMs(1400), () => {
         this.startBattle();
       });
       return;
@@ -1050,7 +1096,7 @@ export class BattleScene extends Phaser.Scene {
     this.hud.pushHistory(msg);
     this.runState.logHistory.push(msg);
     this.saveService.save(this.runState);
-    this.time.delayedCall(1400, () => this.onFloorWin());
+    this.time.delayedCall(this.scaleBattleMs(1400), () => this.onFloorWin());
   }
 
   private onFloorWin(): void {
@@ -1221,7 +1267,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private restartFloorAfterReward(): void {
-    this.time.delayedCall(900, () => {
+    this.time.delayedCall(this.scaleBattleMs(900), () => {
       this.buildFloor();
       this.startBattle();
     });
@@ -1255,6 +1301,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private playActionAnimation(actor?: Character, targets: Character[] = []): void {
+    const pace = Math.max(1, this.getBattlePace());
     const primaryTarget = targets[0];
     let destination: { x: number; y: number } | null = null;
     if (primaryTarget) {
@@ -1289,7 +1336,7 @@ export class BattleScene extends Phaser.Scene {
             targets: actorTargets,
             x: `+=${moveX}`,
             y: `+=${moveY}`,
-            duration: 160,
+            duration: Math.max(50, Math.round(160 / pace)),
             yoyo: true,
             ease: "Quad.easeOut"
           });
@@ -1297,7 +1344,7 @@ export class BattleScene extends Phaser.Scene {
           this.tweens.add({
             targets: [node.body, node.icon],
             scale: 1.08,
-            duration: 120,
+            duration: Math.max(40, Math.round(120 / pace)),
             yoyo: true
           });
         }
@@ -1309,16 +1356,16 @@ export class BattleScene extends Phaser.Scene {
       const node = this.visuals.get(target.id);
       if (!node) return;
       this.tweens.add({
-        targets: [node.body, node.icon],
+        targets: [node.body, node.icon, node.hp],
         x: `+=${index % 2 === 0 ? 8 : -8}`,
-        duration: 70,
+        duration: Math.max(30, Math.round(70 / pace)),
         yoyo: true,
         repeat: 2
       });
       this.tweens.add({
         targets: node.body,
         alpha: 0.55,
-        duration: 90,
+        duration: Math.max(35, Math.round(90 / pace)),
         yoyo: true,
         repeat: 1
       });
@@ -1332,7 +1379,7 @@ export class BattleScene extends Phaser.Scene {
         targets: marker,
         y: marker.y - 24,
         alpha: 0,
-        duration: 420,
+        duration: Math.max(120, Math.round(420 / pace)),
         onComplete: () => marker.destroy()
       });
     });
@@ -1373,8 +1420,9 @@ export class BattleScene extends Phaser.Scene {
     const rawDurationSec = Math.max(0, instance.duration || 0);
     const seekSec = rawDurationSec > skip ? skip : 0;
     const remainingDurationSec = Math.max(0, rawDurationSec - seekSec);
-    const durationMs = Math.round(remainingDurationSec * 1000);
-    instance.play({ volume, seek: seekSec });
+    const pace = this.getBattlePace();
+    const durationMs = Math.max(0, Math.round((remainingDurationSec * 1000) / pace));
+    instance.play({ volume, seek: seekSec, rate: pace });
     instance.once("complete", () => instance.destroy());
     return durationMs;
   }

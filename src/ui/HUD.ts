@@ -12,6 +12,8 @@ export class HUD {
   private readonly scene: Phaser.Scene;
   private readonly onAbandon: () => void;
   private readonly onTypographyChanged: () => void;
+  private readonly getBattlePace: () => number;
+  private readonly onBattleSpeed2x: (enabled: boolean) => void;
   private textMode: TypographyMode = loadTypographyMode();
   private textScale = getTypographyScale(this.textMode);
   private readonly bottomPanel: Phaser.GameObjects.Rectangle;
@@ -20,6 +22,7 @@ export class HUD {
   private readonly turnLabel: Phaser.GameObjects.Text;
   private readonly logLabel: Phaser.GameObjects.Text;
   private readonly queueLabel: Phaser.GameObjects.Text;
+  private readonly speedButton: Phaser.GameObjects.Text;
   private readonly historyButton: Phaser.GameObjects.Text;
   private readonly abandonButton: Phaser.GameObjects.Text;
   private readonly settingsButton: Phaser.GameObjects.Text;
@@ -37,6 +40,7 @@ export class HUD {
   private historyVisible = false;
   private settingsVisible = false;
   private confirmVisible = false;
+  private battleSpeed2x = false;
   private readonly recentLogs: string[] = [];
   private readonly skillButtons: Phaser.GameObjects.GameObject[] = [];
   private readonly partyWidgets: Phaser.GameObjects.GameObject[] = [];
@@ -47,22 +51,49 @@ export class HUD {
   private activeParty: Character[] = [];
   private activeSkillClick: ((skill: ISkill) => void) | null = null;
 
-  constructor(scene: Phaser.Scene, onAbandon: () => void, onTypographyChanged: () => void) {
+  constructor(
+    scene: Phaser.Scene,
+    onAbandon: () => void,
+    onTypographyChanged: () => void,
+    getBattlePace: () => number,
+    onBattleSpeed2x: (enabled: boolean) => void
+  ) {
     this.scene = scene;
     this.onAbandon = onAbandon;
     this.onTypographyChanged = onTypographyChanged;
-    this.bottomPanel = scene.add.rectangle(0, 0, 10, 10, 0x1b1d22, 0.97).setDepth(995).setOrigin(0);
-    this.partyPanel = scene.add.rectangle(0, 0, 10, 10, 0x24272d, 0.98).setDepth(996).setOrigin(0);
-    this.actionPanel = scene.add.rectangle(0, 0, 10, 10, 0x30343b, 0.98).setDepth(997).setOrigin(0);
+    this.getBattlePace = getBattlePace;
+    this.onBattleSpeed2x = onBattleSpeed2x;
+    this.bottomPanel = scene.add.rectangle(0, 0, 10, 10, 0x1b1d22, 0.97).setDepth(995).setOrigin(0).setScrollFactor(0);
+    this.partyPanel = scene.add.rectangle(0, 0, 10, 10, 0x24272d, 0.98).setDepth(996).setOrigin(0).setScrollFactor(0);
+    this.actionPanel = scene.add.rectangle(0, 0, 10, 10, 0x30343b, 0.98).setDepth(997).setOrigin(0).setScrollFactor(0);
     this.turnLabel = scene.add
       .text(16, 470, "", { fontSize: "18px", color: "#ffffff", wordWrap: { width: 920 } })
-      .setDepth(1000);
+      .setDepth(1000)
+      .setScrollFactor(0);
     this.logLabel = scene.add
       .text(16, 500, "Listo", { fontSize: "16px", color: "#d2d2d2", wordWrap: { width: 980 } })
-      .setDepth(1000);
+      .setDepth(1000)
+      .setScrollFactor(0);
     this.queueLabel = scene.add
       .text(16, 16, "", { fontSize: "14px", color: "#d5d8df" })
-      .setDepth(1000);
+      .setDepth(1000)
+      .setScrollFactor(0);
+
+    this.speedButton = scene.add
+      .text(12, 10, "▶ x2", {
+        fontSize: "14px",
+        color: "#0e1116",
+        backgroundColor: "#8fd4ff",
+        padding: { x: 10, y: 6 }
+      })
+      .setDepth(1100)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    this.speedButton.on("pointerdown", () => {
+      this.battleSpeed2x = !this.battleSpeed2x;
+      this.refreshSpeedButton();
+      this.onBattleSpeed2x(this.battleSpeed2x);
+    });
 
     this.historyButton = scene.add
       .text(890, 16, "Historial", {
@@ -72,6 +103,7 @@ export class HUD {
         padding: { x: 10, y: 6 }
       })
       .setDepth(1100)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.historyButton.on("pointerdown", () => {
       this.historyVisible = !this.historyVisible;
@@ -86,6 +118,7 @@ export class HUD {
         padding: { x: 10, y: 6 }
       })
       .setDepth(1100)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.abandonButton.on("pointerdown", () => this.toggleConfirm(true));
     this.settingsButton = scene.add
@@ -96,27 +129,30 @@ export class HUD {
         padding: { x: 10, y: 4 }
       })
       .setDepth(1100)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.settingsButton.on("pointerdown", () => this.toggleSettings(!this.settingsVisible));
 
-    this.historyPanelBg = scene.add.rectangle(775, 170, 480, 300, 0x15171b, 0.94).setDepth(1090);
+    this.historyPanelBg = scene.add.rectangle(775, 170, 480, 300, 0x15171b, 0.94).setDepth(1090).setScrollFactor(0);
     this.historyPanelText = scene.add
       .text(545, 30, "Ultimos movimientos", {
         fontSize: "12px",
         color: "#ffffff",
         wordWrap: { width: 450 }
       })
-      .setDepth(1091);
+      .setDepth(1091)
+      .setScrollFactor(0);
     this.historyPanelBg.setVisible(false);
     this.historyPanelText.setVisible(false);
-    this.settingsPanelBg = scene.add.rectangle(540, 170, 380, 250, 0x15171b, 0.96).setDepth(1140);
+    this.settingsPanelBg = scene.add.rectangle(540, 170, 380, 250, 0x15171b, 0.96).setDepth(1140).setScrollFactor(0);
     this.settingsTitle = scene.add
       .text(540, 95, "Ajustes", {
         fontSize: "22px",
         color: "#ffffff"
       })
       .setOrigin(0.5)
-      .setDepth(1141);
+      .setDepth(1141)
+      .setScrollFactor(0);
     this.settingNormalBtn = scene.add
       .text(540, 140, "Tipografia: Normal", {
         fontSize: "16px",
@@ -126,6 +162,7 @@ export class HUD {
       })
       .setOrigin(0.5)
       .setDepth(1141)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.settingLargeBtn = scene.add
       .text(540, 185, "Tipografia: Grande", {
@@ -136,6 +173,7 @@ export class HUD {
       })
       .setOrigin(0.5)
       .setDepth(1141)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.settingXLargeBtn = scene.add
       .text(540, 230, "Tipografia: Extra", {
@@ -146,12 +184,13 @@ export class HUD {
       })
       .setOrigin(0.5)
       .setDepth(1141)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.settingNormalBtn.on("pointerdown", () => this.setTextMode("normal"));
     this.settingLargeBtn.on("pointerdown", () => this.setTextMode("large"));
     this.settingXLargeBtn.on("pointerdown", () => this.setTextMode("xlarge"));
     this.toggleSettings(false);
-    this.confirmBg = scene.add.rectangle(512, 300, 560, 220, 0x15171b, 0.97).setDepth(1200);
+    this.confirmBg = scene.add.rectangle(512, 300, 560, 220, 0x15171b, 0.97).setDepth(1200).setScrollFactor(0);
     this.confirmText = scene.add
       .text(512, 260, "¿Seguro que quieres abandonar esta partida?", {
         fontSize: "24px",
@@ -160,7 +199,8 @@ export class HUD {
         wordWrap: { width: 520 }
       })
       .setDepth(1201)
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setScrollFactor(0);
     this.confirmYes = scene.add
       .text(440, 340, "Si, abandonar", {
         fontSize: "20px",
@@ -170,6 +210,7 @@ export class HUD {
       })
       .setDepth(1201)
       .setOrigin(0.5)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.confirmNo = scene.add
       .text(585, 340, "No", {
@@ -180,6 +221,7 @@ export class HUD {
       })
       .setDepth(1201)
       .setOrigin(0.5)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     this.confirmYes.on("pointerdown", () => {
       this.toggleConfirm(false);
@@ -189,6 +231,7 @@ export class HUD {
     this.toggleConfirm(false);
 
     this.layout();
+    this.refreshSpeedButton();
     scene.scale.on("resize", () => this.layout());
   }
 
@@ -218,6 +261,16 @@ export class HUD {
     const maxChars = this.scene.scale.width < 760 ? 28 : 64;
     const clipped = value.length > maxChars ? `${value.slice(0, maxChars - 1)}...` : value;
     this.queueLabel.setText(clipped);
+  }
+
+  private refreshSpeedButton(): void {
+    if (this.battleSpeed2x) {
+      this.speedButton.setText("▶ x2 ON");
+      this.speedButton.setBackgroundColor("#5ad88a");
+    } else {
+      this.speedButton.setText("▶ x2");
+      this.speedButton.setBackgroundColor("#8fd4ff");
+    }
   }
 
   clearSkillButtons(): void {
@@ -263,7 +316,8 @@ export class HUD {
       const card = this.scene.add
         .rectangle(x, centerY, cardWidth, cardHeight, 0x3a3e46, 0.98)
         .setStrokeStyle(2, 0xb6bbc4)
-        .setDepth(1001);
+        .setDepth(1001)
+        .setScrollFactor(0);
       if (hero.isAlive) {
         card.setInteractive({ useHandCursor: true });
         card.on("pointerdown", () => this.partySelectHandler?.(hero.id));
@@ -282,14 +336,16 @@ export class HUD {
         const ring = this.scene.add
           .circle(iconX, iconY, portraitRadius + 3, 0x17191d, 1)
           .setStrokeStyle(2, 0xc4c9d2)
-          .setDepth(1002);
+          .setDepth(1002)
+          .setScrollFactor(0);
         this.partyWidgets.push(ring);
         widgetsByUnit.push(ring);
         const icon = this.scene.add
           .image(iconX, iconY, textureKey)
           .setDisplaySize(portraitRadius * 2, portraitRadius * 2)
-          .setDepth(1003);
-        const iconMask = this.scene.add.graphics({ x: 0, y: 0 }).setVisible(false);
+          .setDepth(1003)
+          .setScrollFactor(0);
+        const iconMask = this.scene.add.graphics({ x: 0, y: 0 }).setVisible(false).setScrollFactor(0);
         iconMask.fillStyle(0xffffff);
         iconMask.fillCircle(iconX, iconY, portraitRadius);
         icon.setMask(iconMask.createGeometryMask());
@@ -307,14 +363,16 @@ export class HUD {
           fontSize: `${Math.max(10, Math.round((metrics.isCompact ? 10 : 11) * metrics.layoutScale))}px`,
           color: "#ffffff"
         })
-        .setDepth(1002);
+        .setDepth(1002)
+        .setScrollFactor(0);
       const hpColor = hero.stats.hp / hero.stats.maxHp > 0.35 ? "#9df2b5" : "#ff9a9a";
       const hp = this.scene.add
         .text(x - cardWidth * 0.08, centerY + cardHeight * 0.02, `HP ${hero.stats.hp}/${hero.stats.maxHp}`, {
           fontSize: `${Math.max(9, Math.round((metrics.isCompact ? 9 : 10) * metrics.layoutScale))}px`,
           color: hpColor
         })
-        .setDepth(1002);
+        .setDepth(1002)
+        .setScrollFactor(0);
       if (!hero.isAlive) {
         name.setColor("#9aa3bf");
         hp.setColor("#7d869f");
@@ -332,19 +390,21 @@ export class HUD {
     }
     const flash = this.scene.add
       .rectangle(card.x, card.y, card.width, card.height, 0xf0b4b4, 0.28)
-      .setDepth(1010);
+      .setDepth(1010)
+      .setScrollFactor(0);
     this.partyWidgets.push(flash);
+    const pace = Math.max(1, this.getBattlePace());
     this.scene.tweens.add({
       targets: [card],
       scaleX: 1.06,
       scaleY: 1.06,
-      duration: 90,
+      duration: Math.max(40, Math.round(90 / pace)),
       yoyo: true
     });
     this.scene.tweens.add({
       targets: flash,
       alpha: 0,
-      duration: 260,
+      duration: Math.max(60, Math.round(260 / pace)),
       onComplete: () => {
         flash.destroy();
         const idx = this.partyWidgets.indexOf(flash);
@@ -373,11 +433,12 @@ export class HUD {
     const step = Math.min(52, dist * 0.22);
     const moveX = (dx / dist) * step;
     const moveY = (dy / dist) * step;
+    const pace = Math.max(1, this.getBattlePace());
     this.scene.tweens.add({
       targets: objects,
       x: `+=${moveX}`,
       y: `+=${moveY}`,
-      duration: 160,
+      duration: Math.max(50, Math.round(160 / pace)),
       yoyo: true,
       ease: "Quad.easeOut"
     });
@@ -406,6 +467,7 @@ export class HUD {
         .rectangle(x + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 0x474c55, 1)
         .setStrokeStyle(2, 0xc0c5ce)
         .setDepth(1000)
+        .setScrollFactor(0)
         .setInteractive({ useHandCursor: true });
       const text = this.scene.add
         .text(x + 8, y + 8, `[${index + 1}] ${skill.nameEs}`, {
@@ -413,7 +475,8 @@ export class HUD {
           color: "#f4f5f7",
           wordWrap: { width: buttonWidth - 16 }
         })
-        .setDepth(1001);
+        .setDepth(1001)
+        .setScrollFactor(0);
       rect.on("pointerdown", () => onClick(skill));
       rect.on("pointerover", () => rect.setFillStyle(0x565c67, 1));
       rect.on("pointerout", () => rect.setFillStyle(0x474c55, 1));
@@ -428,7 +491,8 @@ export class HUD {
           backgroundColor: "#434852",
           padding: { x: 12 * buttonScale, y: 8 * buttonScale }
         })
-        .setDepth(1000);
+        .setDepth(1000)
+        .setScrollFactor(0);
       this.skillButtons.push(placeholder);
     }
   }
@@ -456,17 +520,13 @@ export class HUD {
       .setPosition(12, metrics.panelTop + metrics.controlsHeight + metrics.partyRowHeight + metrics.turnSize + 12)
       .setFontSize(metrics.logSize)
       .setWordWrapWidth(metrics.width - 24);
-    this.queueLabel
-      .setPosition(12, metrics.panelTop + 8)
-      .setFontSize(metrics.queueSize)
-      .setWordWrapWidth(metrics.width - 24);
-
-    const controlsY = metrics.panelTop + metrics.queueSize + 14;
+    const topBarY = 8;
     const baseControlFont = metrics.isCompact ? Math.max(11, metrics.queueSize - 1) : metrics.queueSize;
     let controlFont = baseControlFont;
     this.historyButton.setFontSize(controlFont);
     this.abandonButton.setFontSize(controlFont);
     this.settingsButton.setFontSize(controlFont);
+    this.speedButton.setFontSize(Math.max(controlFont, 12));
 
     let historyX = metrics.width - 12 - this.historyButton.displayWidth;
     let abandonX = historyX - 8 - this.abandonButton.displayWidth;
@@ -476,15 +536,22 @@ export class HUD {
       this.historyButton.setFontSize(controlFont);
       this.abandonButton.setFontSize(controlFont);
       this.settingsButton.setFontSize(controlFont);
+      this.speedButton.setFontSize(Math.max(controlFont, 11));
       historyX = metrics.width - 12 - this.historyButton.displayWidth;
       abandonX = historyX - 8 - this.abandonButton.displayWidth;
       settingsX = abandonX - 8 - this.settingsButton.displayWidth;
     }
 
-    this.historyButton.setPosition(historyX, controlsY);
-    this.abandonButton.setPosition(abandonX, controlsY);
-    this.settingsButton.setPosition(settingsX, controlsY);
-    this.queueLabel.setWordWrapWidth(Math.max(120, settingsX - 20));
+    this.speedButton.setPosition(12, topBarY);
+    this.historyButton.setPosition(historyX, topBarY);
+    this.abandonButton.setPosition(abandonX, topBarY);
+    this.settingsButton.setPosition(settingsX, topBarY);
+
+    const queueTop = topBarY + Math.max(this.speedButton.displayHeight, this.historyButton.displayHeight) + 8;
+    this.queueLabel
+      .setPosition(12, queueTop)
+      .setFontSize(metrics.queueSize)
+      .setWordWrapWidth(Math.max(120, settingsX - 24));
     this.historyPanelBg.setPosition(metrics.width * 0.5, Math.max(140, metrics.height * 0.28));
     this.historyPanelBg.setSize(Math.min(metrics.width * 0.9, 500), Math.min(metrics.height * 0.42, 330));
     this.historyPanelText
@@ -526,6 +593,7 @@ export class HUD {
     if (this.activeSkillClick) {
       this.renderSkills(this.activeSkills, this.activeSkillClick);
     }
+    this.refreshSpeedButton();
   }
 
   private getLayoutMetrics(): {

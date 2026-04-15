@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { installViewportPan } from "../core/ViewportPan";
 import { SCENE_SELECTION } from "./SceneKeys";
 
 export class GameOverScene extends Phaser.Scene {
@@ -13,6 +14,7 @@ export class GameOverScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#08080f");
     this.renderResponsive();
     this.scale.on("resize", () => this.renderResponsive());
+    installViewportPan(this);
   }
 
   private renderResponsive(): void {

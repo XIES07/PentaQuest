@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { installViewportPan } from "../core/ViewportPan";
 import { createInitialProgress, getAllTemplates } from "../core/GameData";
 import { SaveService } from "../core/SaveService";
 import type { RunState, Role } from "../core/types";
@@ -26,6 +27,7 @@ export class SelectionScene extends Phaser.Scene {
     this.playMenuMusic();
     this.renderResponsive();
     this.scale.on("resize", () => this.renderResponsive());
+    installViewportPan(this);
   }
 
   private renderResponsive(): void {
@@ -33,71 +35,95 @@ export class SelectionScene extends Phaser.Scene {
     const width = this.scale.width;
     const height = this.scale.height;
     const compact = width < 760;
-    const titleSize = compact ? "34px" : "46px";
-    const subtitleSize = compact ? "16px" : "20px";
+    const titleSize = compact ? "32px" : "46px";
+    const subtitleSize = compact ? "15px" : "20px";
+    const padX = Math.max(12, width * 0.04);
 
-    this.add.text(width / 2, height * 0.1, "PentaQuest", { fontSize: titleSize, color: "#ffffff", fontStyle: "bold" }).setOrigin(0.5);
-    this.add.text(width / 2, height * 0.16, "Selecciona tu heroe inicial", { fontSize: subtitleSize, color: "#ffd37a" }).setOrigin(0.5);
+    let y = Math.max(18, height * 0.04);
+    this.add
+      .text(width / 2, y, "PentaQuest", { fontSize: titleSize, color: "#ffffff", fontStyle: "bold" })
+      .setOrigin(0.5, 0);
+    y += compact ? 44 : 56;
+    this.add
+      .text(width / 2, y, "Selecciona tu heroe inicial", { fontSize: subtitleSize, color: "#ffd37a", wordWrap: { width: width - padX * 2 }, align: "center" })
+      .setOrigin(0.5, 0);
+    y += compact ? 30 : 36;
 
     const save = this.saveService.load();
     if (save) {
       const continueBtn = this.add
-        .text(width / 2, height * 0.24, "[ Continuar partida ]", {
-          fontSize: compact ? "18px" : "24px",
+        .text(width / 2, y, "[ Continuar partida ]", {
+          fontSize: compact ? "17px" : "22px",
           color: "#6cf797",
           backgroundColor: "#133820",
-          padding: { x: compact ? 12 : 16, y: compact ? 6 : 8 }
+          padding: { x: compact ? 12 : 16, y: compact ? 8 : 9 }
         })
-        .setOrigin(0.5)
+        .setOrigin(0.5, 0)
         .setInteractive({ useHandCursor: true });
       continueBtn.on("pointerdown", () => {
         this.stopMenuMusic();
         this.scene.start(SCENE_BATTLE, { runState: save });
       });
+      y += continueBtn.height + 20;
+    } else {
+      y += 12;
     }
 
     const templates = getAllTemplates();
     const columns = width >= 980 ? 5 : width >= 680 ? 3 : 2;
     const rows = Math.ceil(templates.length / columns);
-    const cardWidth = Math.min(150, Math.floor((width - 30) / columns) - 12);
-    const cardHeight = compact ? 180 : 196;
-    const gapX = Math.max(12, Math.floor((width - columns * cardWidth) / (columns + 1)));
-    const topY = save ? height * 0.36 : height * 0.31;
-    const rawGapY = Math.floor((height * 0.9 - topY - rows * cardHeight) / Math.max(1, rows - 1));
-    const gapY = Math.max(12, Math.min(28, rawGapY));
+    const cardWidth = Math.min(compact ? 142 : 150, Math.floor((width - padX * 2) / columns) - 10);
+    const cardHeight = compact ? 196 : 208;
+    const gapX = Math.max(10, Math.floor((width - columns * cardWidth) / (columns + 1)));
+    const topY = y + 16;
+    const bottomReserve = Math.min(100, height * 0.08);
+    const rawGapY = Math.floor((height - bottomReserve - topY - rows * cardHeight) / Math.max(1, rows - 1));
+    const gapY = Math.max(10, Math.min(26, rawGapY));
+
+    const portraitPx = compact ? 70 : 88;
 
     templates.forEach((template, index) => {
       const col = index % columns;
       const row = Math.floor(index / columns);
       const x = gapX + cardWidth / 2 + col * (cardWidth + gapX);
-      const y = topY + row * (cardHeight + gapY);
-      this.add.rectangle(x, y, cardWidth, cardHeight, 0x1a2238, 1).setStrokeStyle(2, 0x35508a);
+      const cy = topY + row * (cardHeight + gapY) + cardHeight / 2;
+      this.add.rectangle(x, cy, cardWidth, cardHeight, 0x1a2238, 1).setStrokeStyle(2, 0x35508a).setDepth(0);
       this.add
-        .text(x, y - cardHeight * 0.26, template.nameEs, { fontSize: compact ? "14px" : "16px", color: "#ffffff", align: "center" })
-        .setOrigin(0.5);
+        .text(x, cy - cardHeight * 0.42, template.nameEs, {
+          fontSize: compact ? "13px" : "16px",
+          color: "#ffffff",
+          align: "center",
+          wordWrap: { width: cardWidth - 10 }
+        })
+        .setOrigin(0.5, 0.5)
+        .setDepth(2);
       const textureKey = this.getSelectionTextureKey(template.role);
       if (this.textures.exists(textureKey)) {
         this.add
-          .image(x, y - cardHeight * 0.02, textureKey)
-          .setDisplaySize(compact ? 82 : 96, compact ? 82 : 96);
+          .image(x, cy - cardHeight * 0.06, textureKey)
+          .setDisplaySize(portraitPx, portraitPx)
+          .setDepth(1);
       }
 
       this.add
-        .text(x, y + cardHeight * 0.17, `HP ${template.baseStats.maxHp}\nATK ${template.baseStats.attack}\nDEF ${template.baseStats.defense}`, {
+        .text(x, cy + cardHeight * 0.28, `HP ${template.baseStats.maxHp}\nATK ${template.baseStats.attack}\nDEF ${template.baseStats.defense}`, {
           fontSize: compact ? "11px" : "12px",
           color: "#d2ddff",
-          align: "center"
+          align: "center",
+          lineSpacing: 2
         })
-        .setOrigin(0.5);
+        .setOrigin(0.5, 0.5)
+        .setDepth(2);
 
       const btn = this.add
-        .text(x, y + cardHeight * 0.4, "Elegir", {
+        .text(x, cy + cardHeight * 0.4, "Elegir", {
           fontSize: compact ? "12px" : "14px",
           color: "#121212",
           backgroundColor: "#ffd37a",
-          padding: { x: compact ? 8 : 10, y: compact ? 4 : 5 }
+          padding: { x: compact ? 10 : 12, y: compact ? 6 : 7 }
         })
-        .setOrigin(0.5)
+        .setOrigin(0.5, 0.5)
+        .setDepth(3)
         .setInteractive({ useHandCursor: true });
       btn.on("pointerdown", () => this.startNewRun(template.role));
     });
