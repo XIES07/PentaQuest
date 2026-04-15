@@ -41,6 +41,8 @@ const SFX = {
 } as const;
 const SFX_HIT_SKIP_SEC = 4;
 const SFX_ARROW_SKIP_SEC = 4;
+const SFX_SWORD_SKIP_END_SEC = 3;
+const SFX_SWORD_SKIP_SEC = 1;
 const SFX_SLIME_BALL_SKIP_SEC = 4;
 
 export class BattleScene extends Phaser.Scene {
@@ -775,7 +777,7 @@ export class BattleScene extends Phaser.Scene {
     if (summon.summonType === "bear") {
       if (Math.random() < 0.5) {
         summon.tauntTurns = 1;
-        this.queueTurnSound(SFX.SWORD, 0.62);
+        this.queueTurnSound(SFX.SWORD, 0.62, SFX_SWORD_SKIP_SEC, SFX_SWORD_SKIP_END_SEC);
         this.afterAction([`${summon.name} provoca para proteger al equipo.`], 1200, summon, [summon]);
         return;
       }
@@ -1411,24 +1413,38 @@ export class BattleScene extends Phaser.Scene {
     return getTypographyScale(loadTypographyMode());
   }
 
-  private playSfx(key: string, volume = 0.6, skipSec?: number): number {
+  private playSfx(key: string, volume = 0.6, skipSec?: number, skipEndSec?: number): number {
     if (this.sound.locked) {
       return 0;
     }
     const instance = this.sound.add(key);
     const skip = skipSec ?? 0;
+    const skipEnd = skipEndSec ?? 0;
     const rawDurationSec = Math.max(0, instance.duration || 0);
     const seekSec = rawDurationSec > skip ? skip : 0;
-    const remainingDurationSec = Math.max(0, rawDurationSec - seekSec);
+    const seekEndSec = rawDurationSec > skipEnd ? skipEnd : 0;
+    const remainingDurationSec = Math.max(0, rawDurationSec - seekSec - seekEndSec);
+    if (remainingDurationSec <= 0) {
+      instance.destroy();
+      return 0;
+    }
     const pace = this.getBattlePace();
     const durationMs = Math.max(0, Math.round((remainingDurationSec * 1000) / pace));
     instance.play({ volume, seek: seekSec, rate: pace });
-    instance.once("complete", () => instance.destroy());
+    let cleanedUp = false;
+    const cleanup = (): void => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      instance.stop();
+      instance.destroy();
+    };
+    instance.once("complete", cleanup);
+    this.time.delayedCall(durationMs, cleanup);
     return durationMs;
   }
 
-  private queueTurnSound(key: string, volume = 0.6, skipSec?: number): void {
-    const durationMs = this.playSfx(key, volume, skipSec);
+  private queueTurnSound(key: string, volume = 0.6, skipSec?: number, skipEndSec?: number): void {
+    const durationMs = this.playSfx(key, volume, skipSec, skipEndSec);
     this.pendingTurnGateMs = Math.max(this.pendingTurnGateMs, durationMs);
   }
 
@@ -1438,7 +1454,7 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     if (caster.id.includes("tank") && skillId === "taunt") {
-      this.queueTurnSound(SFX.SWORD, 0.62);
+      this.queueTurnSound(SFX.SWORD, 0.62, SFX_SWORD_SKIP_SEC, SFX_SWORD_SKIP_END_SEC);
       return;
     }
     if (caster.id.includes("tank")) {
@@ -1446,7 +1462,7 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     if (caster.id.includes("swordsman")) {
-      this.queueTurnSound(SFX.SWORD, 0.62);
+      this.queueTurnSound(SFX.SWORD, 0.62, SFX_SWORD_SKIP_SEC, SFX_SWORD_SKIP_END_SEC);
       return;
     }
     if (caster.id.includes("healer")) {
@@ -1474,7 +1490,7 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     if (enemy.kind === "skeleton_minion" || enemy.kind === "demon") {
-      this.queueTurnSound(SFX.SWORD, 0.66);
+      this.queueTurnSound(SFX.SWORD, 0.66, SFX_SWORD_SKIP_SEC, SFX_SWORD_SKIP_END_SEC);
       return;
     }
     if (enemy.kind === "slime") {

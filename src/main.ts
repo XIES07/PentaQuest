@@ -6,14 +6,24 @@ import { SCENE_BATTLE, SCENE_GAME_OVER, SCENE_SELECTION } from "./scenes/SceneKe
 
 const initialWidth = Math.max(1, window.innerWidth);
 const initialHeight = Math.max(1, window.innerHeight);
+const renderResolution = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
 
-const config: Phaser.Types.Core.GameConfig = {
+const config = {
   type: Phaser.AUTO,
   width: initialWidth,
   height: initialHeight,
   parent: "app",
   backgroundColor: "#111122",
   scene: [SelectionScene, BattleScene, GameOverScene],
+  resolution: renderResolution,
+  pixelArt: false,
+  antialias: true,
+  antialiasGL: true,
+  render: {
+    antialias: true,
+    pixelArt: false,
+    roundPixels: false
+  },
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -24,8 +34,8 @@ const config: Phaser.Types.Core.GameConfig = {
       height: 240
     }
   },
-  autoRound: true
-};
+  autoRound: false
+} as Phaser.Types.Core.GameConfig;
 
 window.addEventListener("load", () => {
   const game = new Phaser.Game(config);
