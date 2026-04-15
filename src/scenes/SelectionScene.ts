@@ -42,11 +42,19 @@ export class SelectionScene extends Phaser.Scene {
     let y = Math.max(18, height * 0.04);
     this.add
       .text(width / 2, y, "PentaQuest", { fontSize: titleSize, color: "#ffffff", fontStyle: "bold" })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setStroke("#06122f", 5)
+      .setShadow(0, 2, "#04070f", 0.8, true, true);
     y += compact ? 44 : 56;
     this.add
-      .text(width / 2, y, "Selecciona tu heroe inicial", { fontSize: subtitleSize, color: "#ffd37a", wordWrap: { width: width - padX * 2 }, align: "center" })
-      .setOrigin(0.5, 0);
+      .text(width / 2, y, "Selecciona tu heroe inicial", {
+        fontSize: subtitleSize,
+        color: "#ffd37a",
+        wordWrap: { width: width - padX * 2 },
+        align: "center"
+      })
+      .setOrigin(0.5, 0)
+      .setStroke("#000b1d", 2);
     y += compact ? 30 : 36;
 
     const save = this.saveService.load();
@@ -59,6 +67,7 @@ export class SelectionScene extends Phaser.Scene {
           padding: { x: compact ? 12 : 16, y: compact ? 8 : 9 }
         })
         .setOrigin(0.5, 0)
+        .setStroke("#06140d", 2)
         .setInteractive({ useHandCursor: true });
       continueBtn.on("pointerdown", () => {
         this.stopMenuMusic();
@@ -96,7 +105,8 @@ export class SelectionScene extends Phaser.Scene {
           wordWrap: { width: cardWidth - 10 }
         })
         .setOrigin(0.5, 0.5)
-        .setDepth(2);
+        .setDepth(2)
+        .setStroke("#0b1329", 3);
       const textureKey = this.getSelectionTextureKey(template.role);
       if (this.textures.exists(textureKey)) {
         this.add
@@ -113,7 +123,8 @@ export class SelectionScene extends Phaser.Scene {
           lineSpacing: 2
         })
         .setOrigin(0.5, 0.5)
-        .setDepth(2);
+        .setDepth(2)
+        .setStroke("#0a1225", 2);
 
       const btn = this.add
         .text(x, cy + cardHeight * 0.4, "Elegir", {
@@ -124,6 +135,7 @@ export class SelectionScene extends Phaser.Scene {
         })
         .setOrigin(0.5, 0.5)
         .setDepth(3)
+        .setStroke("#fff2be", 1)
         .setInteractive({ useHandCursor: true });
       btn.on("pointerdown", () => this.startNewRun(template.role));
     });

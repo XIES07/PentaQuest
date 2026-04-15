@@ -69,15 +69,18 @@ export class HUD {
     this.turnLabel = scene.add
       .text(16, 470, "", { fontSize: "18px", color: "#ffffff", wordWrap: { width: 920 } })
       .setDepth(1000)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#070a11", 4);
     this.logLabel = scene.add
       .text(16, 500, "Listo", { fontSize: "16px", color: "#d2d2d2", wordWrap: { width: 980 } })
       .setDepth(1000)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#070a11", 3);
     this.queueLabel = scene.add
       .text(16, 16, "", { fontSize: "14px", color: "#d5d8df" })
       .setDepth(1000)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#06090f", 3);
 
     this.speedButton = scene.add
       .text(12, 10, "▶ x2", {
@@ -88,6 +91,7 @@ export class HUD {
       })
       .setDepth(1100)
       .setScrollFactor(0)
+      .setStroke("#e8f4ff", 1)
       .setInteractive({ useHandCursor: true });
     this.speedButton.on("pointerdown", () => {
       this.battleSpeed2x = !this.battleSpeed2x;
@@ -104,6 +108,7 @@ export class HUD {
       })
       .setDepth(1100)
       .setScrollFactor(0)
+      .setStroke("#eef1f7", 1)
       .setInteractive({ useHandCursor: true });
     this.historyButton.on("pointerdown", () => {
       this.historyVisible = !this.historyVisible;
@@ -119,6 +124,7 @@ export class HUD {
       })
       .setDepth(1100)
       .setScrollFactor(0)
+      .setStroke("#1b0507", 2)
       .setInteractive({ useHandCursor: true });
     this.abandonButton.on("pointerdown", () => this.toggleConfirm(true));
     this.settingsButton = scene.add
@@ -130,6 +136,7 @@ export class HUD {
       })
       .setDepth(1100)
       .setScrollFactor(0)
+      .setStroke("#05070d", 2)
       .setInteractive({ useHandCursor: true });
     this.settingsButton.on("pointerdown", () => this.toggleSettings(!this.settingsVisible));
 
@@ -141,7 +148,8 @@ export class HUD {
         wordWrap: { width: 450 }
       })
       .setDepth(1091)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#070a10", 2);
     this.historyPanelBg.setVisible(false);
     this.historyPanelText.setVisible(false);
     this.settingsPanelBg = scene.add.rectangle(540, 170, 380, 250, 0x15171b, 0.96).setDepth(1140).setScrollFactor(0);
@@ -152,7 +160,8 @@ export class HUD {
       })
       .setOrigin(0.5)
       .setDepth(1141)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#070a10", 4);
     this.settingNormalBtn = scene.add
       .text(540, 140, "Tipografia: Normal", {
         fontSize: "16px",
@@ -163,6 +172,7 @@ export class HUD {
       .setOrigin(0.5)
       .setDepth(1141)
       .setScrollFactor(0)
+      .setStroke("#ecf0f7", 1)
       .setInteractive({ useHandCursor: true });
     this.settingLargeBtn = scene.add
       .text(540, 185, "Tipografia: Grande", {
@@ -174,6 +184,7 @@ export class HUD {
       .setOrigin(0.5)
       .setDepth(1141)
       .setScrollFactor(0)
+      .setStroke("#ecf0f7", 1)
       .setInteractive({ useHandCursor: true });
     this.settingXLargeBtn = scene.add
       .text(540, 230, "Tipografia: Extra", {
@@ -185,6 +196,7 @@ export class HUD {
       .setOrigin(0.5)
       .setDepth(1141)
       .setScrollFactor(0)
+      .setStroke("#ecf0f7", 1)
       .setInteractive({ useHandCursor: true });
     this.settingNormalBtn.on("pointerdown", () => this.setTextMode("normal"));
     this.settingLargeBtn.on("pointerdown", () => this.setTextMode("large"));
@@ -200,7 +212,8 @@ export class HUD {
       })
       .setDepth(1201)
       .setOrigin(0.5)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#070a10", 4);
     this.confirmYes = scene.add
       .text(440, 340, "Si, abandonar", {
         fontSize: "20px",
@@ -211,6 +224,7 @@ export class HUD {
       .setDepth(1201)
       .setOrigin(0.5)
       .setScrollFactor(0)
+      .setStroke("#f1dcdc", 1)
       .setInteractive({ useHandCursor: true });
     this.confirmNo = scene.add
       .text(585, 340, "No", {
@@ -222,6 +236,7 @@ export class HUD {
       .setDepth(1201)
       .setOrigin(0.5)
       .setScrollFactor(0)
+      .setStroke("#e1f1e8", 1)
       .setInteractive({ useHandCursor: true });
     this.confirmYes.on("pointerdown", () => {
       this.toggleConfirm(false);
@@ -364,7 +379,8 @@ export class HUD {
           color: "#ffffff"
         })
         .setDepth(1002)
-        .setScrollFactor(0);
+        .setScrollFactor(0)
+        .setStroke("#090c13", 2);
       const hpColor = hero.stats.hp / hero.stats.maxHp > 0.35 ? "#9df2b5" : "#ff9a9a";
       const hp = this.scene.add
         .text(x - cardWidth * 0.08, centerY + cardHeight * 0.02, `HP ${hero.stats.hp}/${hero.stats.maxHp}`, {
@@ -372,7 +388,8 @@ export class HUD {
           color: hpColor
         })
         .setDepth(1002)
-        .setScrollFactor(0);
+        .setScrollFactor(0)
+        .setStroke("#090c13", 2);
       if (!hero.isAlive) {
         name.setColor("#9aa3bf");
         hp.setColor("#7d869f");
@@ -476,7 +493,8 @@ export class HUD {
           wordWrap: { width: buttonWidth - 16 }
         })
         .setDepth(1001)
-        .setScrollFactor(0);
+        .setScrollFactor(0)
+        .setStroke("#090c13", 2);
       rect.on("pointerdown", () => onClick(skill));
       rect.on("pointerover", () => rect.setFillStyle(0x565c67, 1));
       rect.on("pointerout", () => rect.setFillStyle(0x474c55, 1));
@@ -492,7 +510,8 @@ export class HUD {
           padding: { x: 12 * buttonScale, y: 8 * buttonScale }
         })
         .setDepth(1000)
-        .setScrollFactor(0);
+        .setScrollFactor(0)
+        .setStroke("#090c13", 2);
       this.skillButtons.push(placeholder);
     }
   }

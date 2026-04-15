@@ -25,13 +25,17 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(width / 2, height * 0.28, "GAME OVER", { fontSize: compact ? "44px" : "62px", color: "#ff6666", fontStyle: "bold" })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setStroke("#2a0a0a", 6)
+      .setShadow(0, 2, "#000000", 0.85, true, true);
     this.add
       .text(width / 2, height * 0.46, `Piso alcanzado: ${this.payload.reachedFloor}`, { fontSize: compact ? "20px" : "24px", color: "#ffffff" })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setStroke("#0a0c12", 4);
     this.add
       .text(width / 2, height * 0.54, `Mejor piso: ${this.payload.bestFloor}`, { fontSize: compact ? "20px" : "24px", color: "#89b4ff" })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setStroke("#0a0f1d", 4);
 
     const retry = this.add
       .text(width / 2, height * 0.72, "[ Volver al menu ]", {
@@ -41,6 +45,7 @@ export class GameOverScene extends Phaser.Scene {
         padding: { x: compact ? 14 : 18, y: compact ? 6 : 8 }
       })
       .setOrigin(0.5)
+      .setStroke("#dcffe9", 1)
       .setInteractive({ useHandCursor: true });
     retry.on("pointerdown", () => this.scene.start(SCENE_SELECTION));
   }

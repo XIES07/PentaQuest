@@ -358,7 +358,12 @@ export class BattleScene extends Phaser.Scene {
     const textureKey = this.getTextureKey(character);
     const { icon, iconMask } = this.createIconVisual(textureKey, emoji, x, y, fittedSide, maskR);
     const name = this.add
-      .text(x, y + 84 * visualScale, character.name, { fontSize: `${nameSize}px`, color: "#eceef2" })
+      .text(x, y + 84 * visualScale, character.name, {
+        fontSize: `${nameSize}px`,
+        color: "#eceef2",
+        stroke: "#070b14",
+        strokeThickness: 4
+      })
       .setOrigin(0.5)
       .setDepth(32);
     const hpLift = Math.round(10 * visualScale);
@@ -414,7 +419,8 @@ export class BattleScene extends Phaser.Scene {
     const icon = this.add
       .text(x, y, fallbackEmoji, { fontSize: `${iconSize}px` })
       .setOrigin(0.5)
-      .setDepth(31);
+      .setDepth(31)
+      .setStroke("#05070c", 3);
     return { icon };
   }
 
@@ -1202,7 +1208,9 @@ export class BattleScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(depthText)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#071022", 5)
+      .setShadow(0, 2, "#01040a", 0.75, true, true);
 
     const subtitle = this.add
       .text(centerX, centerY - panelHeight * 0.2, "Elige un personaje para sumar al equipo", {
@@ -1213,7 +1221,8 @@ export class BattleScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(depthText)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setStroke("#0a1224", 3);
 
     this.recruitmentOverlay = [dim, bg, title, subtitle];
 
@@ -1239,6 +1248,7 @@ export class BattleScene extends Phaser.Scene {
         .text(btnX, btnY, `${index + 1}. ${template.nameEs}`, {
           fontSize: btnFont,
           color: "#0d1118",
+          fontStyle: "bold",
           backgroundColor: "#7df0b2",
           padding: { x: padX, y: padY },
           align: "center",
@@ -1246,7 +1256,9 @@ export class BattleScene extends Phaser.Scene {
         })
         .setDepth(depthText)
         .setOrigin(0.5)
-        .setScrollFactor(0);
+        .setScrollFactor(0)
+        .setStroke("#f2fff7", 1)
+        .setShadow(0, 1, "#f4fff8", 0.7, true, true);
       const hitW = Math.max(btn.width + 32, Math.min(panelWidth - 20, width - 28));
       const hitH = Math.max(btn.height + 22, isCompact ? 52 : 46);
       btn.setInteractive({
@@ -1376,7 +1388,8 @@ export class BattleScene extends Phaser.Scene {
           fontSize: `${Math.round(24 * this.getTypographyScale())}px`
         })
         .setOrigin(0.5)
-        .setDepth(80);
+        .setDepth(80)
+        .setStroke("#04070d", 3);
       this.tweens.add({
         targets: marker,
         y: marker.y - 24,
