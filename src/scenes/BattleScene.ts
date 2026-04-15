@@ -103,7 +103,7 @@ export class BattleScene extends Phaser.Scene {
     this.load.audio(SFX.SWORD, "/assets/efects/Sonido De espada Sonido Edit.mp3");
     this.load.audio(SFX.FIREBALL, "/assets/efects/sound effect  de gran bola de fuego.mp3");
     this.load.audio(SFX.ARROW, "/assets/efects/ARCO Y FLECHA efecto de sonido.mp3");
-    this.load.audio(BattleScene.BGM_COMBAT_KEY, "/assets/songs/combat/combate%20music.mp3");
+    this.load.audio(BattleScene.BGM_COMBAT_KEY, "/assets/songs/combat/combate_music.mp3");
   }
 
   create(): void {
